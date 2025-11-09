@@ -50,7 +50,7 @@ export class DiffAnalyzer {
                 });
             } else if (line.startsWith('@')) {
                 // Line number info
-                const match = line.match(/@@ -\d+,?\d* \+(\d+),?\d* @@/);
+                const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
                 if (match) {
                     currentLine = parseInt(match[1], 10);
                 }
