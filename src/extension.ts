@@ -1,0 +1,205 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+import { GitManager } from './utils/gitManager';
+import { StatusBarManager } from './utils/statusBarManager';
+import { AIReviewPanel } from './webview/aiReviewPanel';
+import { DiffAnalyzer } from './ai/diff/diffAnalyzer';
+import { ReviewEngine } from './ai/review/reviewEngine';
+import { ExportManager } from './ai/export/exportManager';
+
+export function activate(context: vscode.ExtensionContext) {
+    console.log('GitForWriter is now active');
+
+    const gitManager = new GitManager();
+    const statusBarManager = new StatusBarManager();
+    const diffAnalyzer = new DiffAnalyzer();
+    const reviewEngine = new ReviewEngine();
+    const exportManager = new ExportManager();
+
+    // Register commands
+    const startProjectCommand = vscode.commands.registerCommand('gitforwriter.startProject', async () => {
+        await startWritingProject(gitManager, statusBarManager);
+    });
+
+    const aiReviewCommand = vscode.commands.registerCommand('gitforwriter.aiReview', async () => {
+        await performAIReview(context, gitManager, diffAnalyzer, reviewEngine);
+    });
+
+    const exportDraftCommand = vscode.commands.registerCommand('gitforwriter.exportDraft', async () => {
+        await exportDraft(exportManager);
+    });
+
+    // Register document save handler
+    const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
+        await handleDocumentSave(document, gitManager, diffAnalyzer);
+    });
+
+    context.subscriptions.push(
+        startProjectCommand,
+        aiReviewCommand,
+        exportDraftCommand,
+        saveHandler,
+        statusBarManager
+    );
+
+    // Initialize status bar
+    statusBarManager.updateStage('ideation');
+}
+
+async function startWritingProject(gitManager: GitManager, statusBarManager: StatusBarManager) {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage('Please open a workspace folder first');
+        return;
+    }
+
+    try {
+        // Initialize Git repository if not exists
+        await gitManager.initialize(workspaceFolder.uri.fsPath);
+
+        // Create .gitforwriter directory
+        const gitforwriterDir = path.join(workspaceFolder.uri.fsPath, '.gitforwriter');
+        if (!fs.existsSync(gitforwriterDir)) {
+            fs.mkdirSync(gitforwriterDir, { recursive: true });
+            fs.mkdirSync(path.join(gitforwriterDir, 'diffs'), { recursive: true });
+            fs.mkdirSync(path.join(gitforwriterDir, 'reviews'), { recursive: true });
+        }
+
+        // Create ai directory structure
+        const aiDir = path.join(workspaceFolder.uri.fsPath, 'ai');
+        if (!fs.existsSync(aiDir)) {
+            fs.mkdirSync(path.join(aiDir, 'diff'), { recursive: true });
+            fs.mkdirSync(path.join(aiDir, 'review'), { recursive: true });
+            fs.mkdirSync(path.join(aiDir, 'export'), { recursive: true });
+        }
+
+        // Update status
+        statusBarManager.updateStage('writing');
+
+        vscode.window.showInformationMessage('✅ Writing project initialized successfully!');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to initialize project: ${error}`);
+    }
+}
+
+async function performAIReview(
+    context: vscode.ExtensionContext,
+    gitManager: GitManager,
+    diffAnalyzer: DiffAnalyzer,
+    reviewEngine: ReviewEngine
+) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        vscode.window.showErrorMessage('No active editor');
+        return;
+    }
+
+    const document = editor.document;
+    if (!['markdown', 'latex'].includes(document.languageId)) {
+        vscode.window.showErrorMessage('AI Review only supports Markdown and LaTeX files');
+        return;
+    }
+
+    try {
+        vscode.window.showInformationMessage('🔍 Analyzing changes...');
+
+        // Get git diff
+        const diff = await gitManager.getDiff(document.fileName);
+        
+        // Analyze diff semantically
+        const analysis = await diffAnalyzer.analyze(diff, document.getText());
+        
+        // Generate review
+        const review = await reviewEngine.generateReview(analysis);
+
+        // Show review panel
+        AIReviewPanel.createOrShow(context.extensionUri, review);
+
+        vscode.window.showInformationMessage('✅ AI Review completed');
+    } catch (error) {
+        vscode.window.showErrorMessage(`AI Review failed: ${error}`);
+    }
+}
+
+async function exportDraft(exportManager: ExportManager) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        vscode.window.showErrorMessage('No active editor');
+        return;
+    }
+
+    const document = editor.document;
+    const format = await vscode.window.showQuickPick(
+        ['markdown', 'latex', 'pdf'],
+        { placeHolder: 'Select export format' }
+    );
+
+    if (!format) {
+        return;
+    }
+
+    try {
+        const outputPath = await exportManager.export(document, format);
+        vscode.window.showInformationMessage(`✅ Exported to: ${outputPath}`);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Export failed: ${error}`);
+    }
+}
+
+async function handleDocumentSave(
+    document: vscode.TextDocument,
+    gitManager: GitManager,
+    diffAnalyzer: DiffAnalyzer
+) {
+    // Only process Markdown and LaTeX files
+    if (!['markdown', 'latex'].includes(document.languageId)) {
+        return;
+    }
+
+    const config = vscode.workspace.getConfiguration('gitforwriter');
+    if (!config.get('autoSave', true)) {
+        return;
+    }
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        return;
+    }
+
+    try {
+        // Get diff
+        const diff = await gitManager.getDiff(document.fileName);
+        
+        if (!diff || diff.trim() === '') {
+            return;
+        }
+
+        // Save diff to .gitforwriter directory
+        const gitforwriterDir = path.join(workspaceFolder.uri.fsPath, '.gitforwriter', 'diffs');
+        if (!fs.existsSync(gitforwriterDir)) {
+            fs.mkdirSync(gitforwriterDir, { recursive: true });
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = path.basename(document.fileName);
+        const diffPath = path.join(gitforwriterDir, `${fileName}_${timestamp}.diff`);
+
+        fs.writeFileSync(diffPath, diff);
+
+        // Quick analysis
+        const analysis = await diffAnalyzer.quickAnalyze(diff);
+        
+        // Save analysis
+        const analysisPath = path.join(gitforwriterDir, `${fileName}_${timestamp}.json`);
+        fs.writeFileSync(analysisPath, JSON.stringify(analysis, null, 2));
+
+        console.log(`Diff saved: ${diffPath}`);
+    } catch (error) {
+        console.error('Failed to handle document save:', error);
+    }
+}
+
+export function deactivate() {
+    console.log('GitForWriter deactivated');
+}
