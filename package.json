@@ -60,7 +60,7 @@
     "lint": "eslint src --ext ts",
     "pretest": "npm run compile",
     "test": "npm run test:unit",
-    "test:unit": "./node_modules/.bin/mocha --require ts-node/register 'src/test/unit/**/*.test.ts'",
+    "test:unit": "mocha --require ts-node/register 'src/test/unit/**/*.test.ts'",
     "test:coverage": "nyc --reporter=text --reporter=html npm run test:unit",
     "test:integration": "node ./out/test/runTest.js"
   },

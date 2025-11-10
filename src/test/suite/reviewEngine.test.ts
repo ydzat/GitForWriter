@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { ReviewEngine } from '../../ai/review/reviewEngine';
-import { DiffAnalysis, SemanticChange, ConsistencyReport } from '../../ai/diff/diffAnalyzer';
+import { DiffAnalysis, SemanticChange } from '../../ai/diff/diffAnalyzer';
 
 suite('ReviewEngine Test Suite', () => {
     let reviewEngine: ReviewEngine;
