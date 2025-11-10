@@ -211,6 +211,17 @@ export class SuggestionApplicator {
             };
         }
 
+        // Check if column numbers are within line bounds
+        const startLine = document.lineAt(suggestion.startLine);
+        const endLine = document.lineAt(suggestion.endLine);
+
+        if (suggestion.startColumn > startLine.text.length || suggestion.endColumn > endLine.text.length) {
+            return {
+                valid: false,
+                reason: 'Column numbers are out of line bounds. The document may have been modified.'
+            };
+        }
+
         // Check if the original text still matches
         try {
             const range = new vscode.Range(
