@@ -71,6 +71,8 @@ export class AIReviewPanel {
     private _update(review: Review, filePath?: string) {
         this._currentReview = review;
         this._filePath = filePath;
+        // Clear applied suggestions when updating to a new review
+        this._appliedSuggestions.clear();
         this._panel.webview.html = this._getHtmlForWebview(review);
     }
 
@@ -122,7 +124,7 @@ export class AIReviewPanel {
                 success: true
             });
         } else {
-            vscode.window.showErrorMessage(`❌ ${result.message}: ${result.error || ''}`);
+            vscode.window.showErrorMessage(`❌ ${result.message}${result.error ? ': ' + result.error : ''}`);
 
             // Update webview to show error state
             this._sendMessageToWebview({
@@ -407,7 +409,7 @@ export class AIReviewPanel {
             <div class="suggestion" id="suggestion-${s.id}">
                 <span class="suggestion-type type-${s.type}">${this._getTypeLabel(s.type)}</span>
                 ${s.line > 0 ? `<span style="opacity: 0.7;"> (第 ${s.line} 行)</span>` : ''}
-                <div class="suggestion-reason">${s.reason}</div>
+                <div class="suggestion-reason">${this._escapeHtml(s.reason)}</div>
                 ${s.original ? `<div style="margin-top: 8px;"><strong>原文：</strong> ${this._escapeHtml(s.original)}</div>` : ''}
                 ${s.suggested ? `<div style="margin-top: 4px;"><strong>建议：</strong> ${this._escapeHtml(s.suggested)}</div>` : ''}
                 <div class="suggestion-buttons">
