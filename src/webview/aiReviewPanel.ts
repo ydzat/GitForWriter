@@ -144,7 +144,9 @@ export class AIReviewPanel {
 
         // Filter out suggestions that don't have actual text changes
         const applicableSuggestions = this._currentReview.suggestions.filter(
-            s => s.suggested && s.suggested.trim() !== '' && !this._appliedSuggestions.has(s.id)
+            s => s.suggested && s.suggested.trim() !== '' &&
+                s.original && s.original.trim() !== '' &&
+                !this._appliedSuggestions.has(s.id)
         );
 
         if (applicableSuggestions.length === 0) {
@@ -182,7 +184,7 @@ export class AIReviewPanel {
                         const displayReason = reason.substring(0, 50) + (reason.length > 50 ? '...' : '');
                         progress.report({
                             message: `${current}/${total}: ${displayReason}`,
-                            increment: (100 / total)
+                            increment: total > 0 ? (100 / total) : 0
                         });
                     }
                 );
@@ -407,8 +409,11 @@ export class AIReviewPanel {
 
     <div class="section">
         <h2>💡 修改建议</h2>
-        ${review.suggestions.length > 0 ? review.suggestions.map((s, index) => `
-            <div class="suggestion" id="suggestion-${s.id}">
+        ${review.suggestions.length > 0 ? review.suggestions.map((s, index) => {
+            // Escape all dynamic values for consistency, even though UUIDs are safe
+            const escapedId = this._escapeHtml(s.id);
+            return `
+            <div class="suggestion" id="suggestion-${escapedId}">
                 <span class="suggestion-type type-${s.type}">${this._getTypeLabel(s.type)}</span>
                 ${s.line > 0 ? `<span style="opacity: 0.7;"> (第 ${s.line} 行)</span>` : ''}
                 <div class="suggestion-reason">${this._escapeHtml(s.reason)}</div>
@@ -416,14 +421,15 @@ export class AIReviewPanel {
                 ${s.suggested ? `<div style="margin-top: 4px;"><strong>建议：</strong> ${this._escapeHtml(s.suggested)}</div>` : ''}
                 <div class="suggestion-buttons">
                     ${s.suggested && s.suggested.trim() !== '' ? `
-                        <button id="btn-${s.id}" onclick="applySuggestion('${s.id}')">
+                        <button id="btn-${escapedId}" onclick="applySuggestion('${escapedId}')">
                             <span class="btn-text">采纳建议</span>
                         </button>
-                        <span id="status-${s.id}" class="status-message"></span>
+                        <span id="status-${escapedId}" class="status-message"></span>
                     ` : ''}
                 </div>
             </div>
-        `).join('') : '<p>暂无具体建议</p>'}
+        `;
+        }).join('') : '<p>暂无具体建议</p>'}
     </div>
 
     <div class="actions">

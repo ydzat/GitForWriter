@@ -275,6 +275,11 @@ export class SuggestionApplicator {
         // But ensure it's a complete path component (not just any suffix)
         // For example: /path/to/file.md should match file.md or to/file.md
         // but not match /different/file.md
+        //
+        // WARNING: Suffix matching could be ambiguous if multiple files with the same name
+        // exist in different directories. However, we allow it for better user experience
+        // when working with relative paths. The text validation in _validateSuggestion
+        // provides an additional safety check.
         if (docPath.endsWith(suggPath)) {
             // Ensure the character before the suffix is a path separator
             const prefixLength = docPath.length - suggPath.length;

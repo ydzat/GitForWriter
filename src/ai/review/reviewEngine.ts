@@ -73,16 +73,17 @@ export class ReviewEngine {
                     // Try to find the exact location in the content
                     const location = this._findTextLocation(fullContent || '', change.description, change.lineNumber);
 
-                    // Determine which modifier(s) are present for accurate message
+                    // Note: _removeExcessiveModifiers removes both "很" and "非常" globally,
+                    // so the message should reflect that all degree adverbs will be removed
                     const hasHen = text.includes('很');
                     const hasFeichang = text.includes('非常');
                     let reasonMessage = '减少程度副词的使用可以使文字更精炼';
                     if (hasHen && hasFeichang) {
-                        reasonMessage = '减少"很"、"非常"等程度副词的使用可以使文字更精炼';
+                        reasonMessage = '减少"很"、"非常"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"和"非常"）';
                     } else if (hasHen) {
-                        reasonMessage = '减少"很"等程度副词的使用可以使文字更精炼';
+                        reasonMessage = '减少"很"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"和"非常"）';
                     } else if (hasFeichang) {
-                        reasonMessage = '减少"非常"等程度副词的使用可以使文字更精炼';
+                        reasonMessage = '减少"非常"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"和"非常"）';
                     }
 
                     suggestions.push({
@@ -156,14 +157,16 @@ export class ReviewEngine {
 
         for (let i = searchStart; i < searchEnd; i++) {
             const line = lines[i];
-            const index = line.indexOf(searchText.trim());
+            const trimmedSearchText = searchText.trim();
+            const index = line.indexOf(trimmedSearchText);
 
             if (index !== -1) {
+                // Use the original searchText length to preserve whitespace in position calculation
                 return {
                     startLine: i,
                     startColumn: index,
                     endLine: i,
-                    endColumn: index + searchText.trim().length
+                    endColumn: index + trimmedSearchText.length
                 };
             }
         }
