@@ -37,7 +37,7 @@ function createSuggestion(
     documentVersion?: number
 ): Suggestion {
     return {
-        id: `suggestion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `suggestion-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
         type,
         filePath,
         startLine,

@@ -1,5 +1,5 @@
 import { DiffAnalysis } from '../diff/diffAnalyzer';
-import { Suggestion } from '../../core/suggestionApplicator';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Review {
     overall: string;
@@ -125,7 +125,7 @@ export class ReviewEngine {
      * Generate a unique ID for suggestions
      */
     private _generateId(): string {
-        return `suggestion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        return uuidv4();
     }
 
     /**
@@ -156,12 +156,13 @@ export class ReviewEngine {
             }
         }
 
-        // Fallback: use the approximate line
-        const lineLength = lines[approximateLine]?.length || 0;
+        // Fallback: use the approximate line, clamped to valid bounds
+        const clampedLine = Math.min(Math.max(0, approximateLine), lines.length - 1);
+        const lineLength = lines[clampedLine]?.length || 0;
         return {
-            startLine: approximateLine,
+            startLine: clampedLine,
             startColumn: 0,
-            endLine: approximateLine,
+            endLine: clampedLine,
             endColumn: lineLength
         };
     }

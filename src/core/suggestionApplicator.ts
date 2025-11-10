@@ -154,9 +154,8 @@ export class SuggestionApplicator {
                 successCount++;
             } else {
                 failureCount++;
-                // Stop on first error (optional behavior)
-                // You can remove this break to continue applying remaining suggestions
-                break;
+                // Continue applying remaining suggestions even if one fails.
+                // All failures and successes will be reported at the end.
             }
 
             // Small delay to allow VSCode to process the edit
@@ -250,9 +249,25 @@ export class SuggestionApplicator {
         // Normalize paths for comparison
         const docPath = document.uri.fsPath.replace(/\\/g, '/');
         const suggPath = suggestionFilePath.replace(/\\/g, '/');
-        
-        // Check if paths match or if suggestion path is a suffix of document path
-        return docPath === suggPath || docPath.endsWith(suggPath);
+
+        // First check for exact match
+        if (docPath === suggPath) {
+            return true;
+        }
+
+        // Check if suggestion path is a suffix of document path
+        // But ensure it's a complete path component (not just any suffix)
+        // For example: /path/to/file.md should match file.md or to/file.md
+        // but not match /different/file.md
+        if (docPath.endsWith(suggPath)) {
+            // Ensure the character before the suffix is a path separator
+            const prefixLength = docPath.length - suggPath.length;
+            if (prefixLength === 0 || docPath[prefixLength - 1] === '/') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 

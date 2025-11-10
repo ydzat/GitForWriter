@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Review, ReviewSuggestion } from '../ai/review/reviewEngine';
+import { Review } from '../ai/review/reviewEngine';
 import { SuggestionApplicator, Suggestion } from '../core/suggestionApplicator';
 
 export class AIReviewPanel {
@@ -177,7 +177,7 @@ export class AIReviewPanel {
                     suggestions,
                     (current, total, suggestion) => {
                         progress.report({
-                            message: `${current}/${total}: ${suggestion.reason.substring(0, 50)}...`,
+                            message: `${current}/${total}: ${(suggestion.reason || '').substring(0, 50)}...`,
                             increment: (100 / total)
                         });
                     }
@@ -446,7 +446,6 @@ export class AIReviewPanel {
             if (button) {
                 button.disabled = true;
                 button.classList.add('applying');
-                button.querySelector('.btn-text').textContent = '应用中...';
                 button.innerHTML = '<span class="spinner"></span> <span class="btn-text">应用中...</span>';
             }
 
@@ -477,10 +476,6 @@ export class AIReviewPanel {
             const message = event.data;
 
             switch (message.command) {
-                case 'suggestionApplying':
-                    // Already handled in applySuggestion function
-                    break;
-
                 case 'suggestionApplied':
                     const suggestionId = message.suggestionId;
                     const button = document.getElementById('btn-' + suggestionId);
