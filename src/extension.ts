@@ -106,15 +106,19 @@ async function performAIReview(
 
         // Get git diff
         const diff = await gitManager.getDiff(document.fileName);
-        
+
+        // Get full content
+        const fullContent = document.getText();
+
         // Analyze diff semantically
-        const analysis = await diffAnalyzer.analyze(diff, document.getText());
-        
-        // Generate review
-        const review = await reviewEngine.generateReview(analysis);
+        const analysis = await diffAnalyzer.analyze(diff, fullContent);
+
+        // Generate review with file path and content for precise suggestions
+        const review = await reviewEngine.generateReview(analysis, document.fileName, fullContent);
+        review.documentVersion = document.version;
 
         // Show review panel
-        AIReviewPanel.createOrShow(context.extensionUri, review);
+        AIReviewPanel.createOrShow(context.extensionUri, review, document.fileName);
 
         vscode.window.showInformationMessage('✅ AI Review completed');
     } catch (error) {
