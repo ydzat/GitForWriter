@@ -161,12 +161,16 @@ export class ReviewEngine {
             const index = line.indexOf(trimmedSearchText);
 
             if (index !== -1) {
-                // Use the original searchText length to preserve whitespace in position calculation
+                // Calculate leading whitespace to adjust column position
+                const leadingWhitespace = searchText.length - searchText.trimStart().length;
+                const startColumn = Math.max(0, index - leadingWhitespace);
+
+                // Use original searchText length to preserve whitespace in position calculation
                 return {
                     startLine: i,
-                    startColumn: index,
+                    startColumn: startColumn,
                     endLine: i,
-                    endColumn: index + trimmedSearchText.length
+                    endColumn: startColumn + searchText.length
                 };
             }
         }
@@ -186,10 +190,10 @@ export class ReviewEngine {
      * Remove excessive modifiers from text
      */
     private _removeExcessiveModifiers(text: string): string {
-        // Simple implementation: remove "很" and "非常"
+        // Improved implementation: remove "很" and "非常" only when used as standalone modifiers
+        // Match "很" or "非常" at the start of the string or after whitespace, followed by a non-whitespace character
         return text
-            .replace(/很/g, '')
-            .replace(/非常/g, '')
+            .replace(/(^|\s)(很|非常)(?=\S)/g, '$1')
             .replace(/\s+/g, ' ')
             .trim();
     }

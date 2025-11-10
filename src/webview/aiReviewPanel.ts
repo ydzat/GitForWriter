@@ -190,7 +190,7 @@ export class AIReviewPanel {
                 );
 
                 // Mark applied suggestions
-                result.results.forEach((r, index) => {
+                result.results.forEach((r) => {
                     if (r.success) {
                         this._appliedSuggestions.add(r.suggestionId);
                         this._sendMessageToWebview({
