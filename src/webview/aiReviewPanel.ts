@@ -178,8 +178,10 @@ export class AIReviewPanel {
                 const result = await this._applicator.applyAllSuggestions(
                     suggestions,
                     (current, total, suggestion) => {
+                        const reason = suggestion.reason || '';
+                        const displayReason = reason.substring(0, 50) + (reason.length > 50 ? '...' : '');
                         progress.report({
-                            message: `${current}/${total}: ${(suggestion.reason || '').substring(0, 50)}...`,
+                            message: `${current}/${total}: ${displayReason}`,
                             increment: (100 / total)
                         });
                     }

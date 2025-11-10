@@ -159,7 +159,7 @@ export class SuggestionApplicator {
             }
 
             // Small delay to allow VSCode to process the edit
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 20));
         }
 
         return { results, successCount, failureCount };
@@ -204,7 +204,9 @@ export class SuggestionApplicator {
         suggestion: Suggestion
     ): { valid: boolean; reason?: string } {
         // Check if line numbers are within document bounds
-        if (suggestion.startLine >= document.lineCount || suggestion.endLine >= document.lineCount) {
+        // Line numbers are 0-based, so the last valid line is document.lineCount - 1
+        if (suggestion.startLine < 0 || suggestion.startLine > document.lineCount - 1 ||
+            suggestion.endLine < 0 || suggestion.endLine > document.lineCount - 1) {
             return {
                 valid: false,
                 reason: 'Line numbers are out of document bounds. The document may have been modified.'
@@ -215,7 +217,10 @@ export class SuggestionApplicator {
         const startLine = document.lineAt(suggestion.startLine);
         const endLine = document.lineAt(suggestion.endLine);
 
-        if (suggestion.startColumn > startLine.text.length || suggestion.endColumn > endLine.text.length) {
+        // Column positions are 0-based, and line.text.length is a valid position (end of line)
+        // for insertions or selections, so we allow positions from 0 to line.text.length (inclusive)
+        if (suggestion.startColumn < 0 || suggestion.startColumn > startLine.text.length ||
+            suggestion.endColumn < 0 || suggestion.endColumn > endLine.text.length) {
             return {
                 valid: false,
                 reason: 'Column numbers are out of line bounds. The document may have been modified.'

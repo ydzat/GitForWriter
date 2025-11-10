@@ -73,6 +73,18 @@ export class ReviewEngine {
                     // Try to find the exact location in the content
                     const location = this._findTextLocation(fullContent || '', change.description, change.lineNumber);
 
+                    // Determine which modifier(s) are present for accurate message
+                    const hasHen = text.includes('很');
+                    const hasFeichang = text.includes('非常');
+                    let reasonMessage = '减少程度副词的使用可以使文字更精炼';
+                    if (hasHen && hasFeichang) {
+                        reasonMessage = '减少"很"、"非常"等程度副词的使用可以使文字更精炼';
+                    } else if (hasHen) {
+                        reasonMessage = '减少"很"等程度副词的使用可以使文字更精炼';
+                    } else if (hasFeichang) {
+                        reasonMessage = '减少"非常"等程度副词的使用可以使文字更精炼';
+                    }
+
                     suggestions.push({
                         id: this._generateId(),
                         type: 'style',
@@ -83,7 +95,7 @@ export class ReviewEngine {
                         endColumn: location.endColumn,
                         original: change.description,
                         suggested: this._removeExcessiveModifiers(change.description),
-                        reason: '减少"很"、"非常"等程度副词的使用可以使文字更精炼'
+                        reason: reasonMessage
                     });
                 }
             }
