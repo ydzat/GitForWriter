@@ -69,7 +69,7 @@ export class ReviewEngine {
                 // Check for common issues in added text
                 const text = change.description.toLowerCase();
 
-                if (text.includes('很') && text.includes('非常')) {
+                if (text.includes('很') || text.includes('非常')) {
                     // Try to find the exact location in the content
                     const location = this._findTextLocation(fullContent || '', change.description, change.lineNumber);
 
