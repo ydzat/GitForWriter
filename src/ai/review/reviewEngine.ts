@@ -1,4 +1,5 @@
 import { DiffAnalysis } from '../diff/diffAnalyzer';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Review {
     overall: string;
@@ -6,18 +7,25 @@ export interface Review {
     improvements: string[];
     suggestions: ReviewSuggestion[];
     rating: number; // 0-10
+    filePath?: string; // File path for the review
+    documentVersion?: number; // Document version for conflict detection
 }
 
 export interface ReviewSuggestion {
+    id: string;
     type: 'grammar' | 'style' | 'structure' | 'content';
-    line: number;
+    line: number; // Display line number (1-based for UI)
+    startLine: number; // 0-based line number for editing
+    startColumn: number; // 0-based column number
+    endLine: number; // 0-based line number
+    endColumn: number; // 0-based column number
     original: string;
     suggested: string;
     reason: string;
 }
 
 export class ReviewEngine {
-    async generateReview(analysis: DiffAnalysis): Promise<Review> {
+    async generateReview(analysis: DiffAnalysis, filePath?: string, fullContent?: string): Promise<Review> {
         const strengths: string[] = [];
         const improvements: string[] = [];
         const suggestions: ReviewSuggestion[] = [];
@@ -42,27 +50,53 @@ export class ReviewEngine {
         // Generate suggestions from consistency report
         for (const suggestion of consistencyReport.suggestions) {
             suggestions.push({
+                id: this._generateId(),
                 type: 'style',
                 line: 0,
+                startLine: 0,
+                startColumn: 0,
+                endLine: 0,
+                endColumn: 0,
                 original: '',
                 suggested: '',
                 reason: suggestion
             });
         }
 
-        // Analyze semantic changes for specific suggestions
+        // Analyze semantic changes for specific suggestions with precise locations
         for (const change of analysis.semanticChanges.slice(0, 5)) {
             if (change.type === 'addition') {
                 // Check for common issues in added text
                 const text = change.description.toLowerCase();
-                
-                if (text.includes('很') && text.includes('非常')) {
+
+                if (text.includes('很') || text.includes('非常')) {
+                    // Try to find the exact location in the content
+                    const location = this._findTextLocation(fullContent || '', change.description, change.lineNumber);
+
+                    // Note: _removeExcessiveModifiers removes both "很" and "非常" globally,
+                    // but the message should only mention the adverbs actually present in the text
+                    const hasHen = text.includes('很');
+                    const hasFeichang = text.includes('非常');
+                    let reasonMessage = '减少程度副词的使用可以使文字更精炼';
+                    if (hasHen && hasFeichang) {
+                        reasonMessage = '减少"很"、"非常"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"和"非常"）';
+                    } else if (hasHen) {
+                        reasonMessage = '减少"很"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"）';
+                    } else if (hasFeichang) {
+                        reasonMessage = '减少"非常"等程度副词的使用可以使文字更精炼（将移除文本中所有"非常"）';
+                    }
+
                     suggestions.push({
+                        id: this._generateId(),
                         type: 'style',
-                        line: change.lineNumber,
+                        line: change.lineNumber + 1, // Display as 1-based
+                        startLine: location.startLine,
+                        startColumn: location.startColumn,
+                        endLine: location.endLine,
+                        endColumn: location.endColumn,
                         original: change.description,
-                        suggested: '避免使用过度修饰词',
-                        reason: '减少"很"、"非常"等程度副词的使用可以使文字更精炼'
+                        suggested: this._removeExcessiveModifiers(change.description),
+                        reason: reasonMessage
                     });
                 }
             }
@@ -94,7 +128,73 @@ export class ReviewEngine {
             strengths: strengths.length > 0 ? strengths : ['继续保持细致的写作态度'],
             improvements: improvements.length > 0 ? improvements : ['暂无明显问题'],
             suggestions,
-            rating: Math.max(0, rating)
+            rating: Math.max(0, rating),
+            filePath,
+            documentVersion: undefined // Will be set by the caller if needed
         };
+    }
+
+    /**
+     * Generate a unique ID for suggestions
+     */
+    private _generateId(): string {
+        return uuidv4();
+    }
+
+    /**
+     * Find the exact location of text in content
+     */
+    private _findTextLocation(
+        content: string,
+        searchText: string,
+        approximateLine: number
+    ): { startLine: number; startColumn: number; endLine: number; endColumn: number } {
+        const lines = content.split('\n');
+
+        // Search around the approximate line
+        const searchStart = Math.max(0, approximateLine - 2);
+        const searchEnd = Math.min(lines.length, approximateLine + 3);
+
+        for (let i = searchStart; i < searchEnd; i++) {
+            const line = lines[i];
+            const trimmedSearchText = searchText.trim();
+            const index = line.indexOf(trimmedSearchText);
+
+            if (index !== -1) {
+                // Calculate leading whitespace to adjust column position
+                const leadingWhitespace = searchText.length - searchText.trimStart().length;
+                const startColumn = Math.max(0, index - leadingWhitespace);
+
+                // Use original searchText length to preserve whitespace in position calculation
+                return {
+                    startLine: i,
+                    startColumn: startColumn,
+                    endLine: i,
+                    endColumn: startColumn + searchText.length
+                };
+            }
+        }
+
+        // Fallback: use the approximate line, clamped to valid bounds
+        const clampedLine = Math.min(Math.max(0, approximateLine), lines.length - 1);
+        const lineLength = lines[clampedLine]?.length || 0;
+        return {
+            startLine: clampedLine,
+            startColumn: 0,
+            endLine: clampedLine,
+            endColumn: lineLength
+        };
+    }
+
+    /**
+     * Remove excessive modifiers from text
+     */
+    private _removeExcessiveModifiers(text: string): string {
+        // Improved implementation: remove "很" and "非常" only when used as standalone modifiers
+        // Match "很" or "非常" at the start of the string or after whitespace, followed by a non-whitespace character
+        return text
+            .replace(/(^|\s)(很|非常)(?=\S)/g, '$1')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 }
