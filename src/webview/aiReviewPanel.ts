@@ -143,9 +143,9 @@ export class AIReviewPanel {
         }
 
         // Filter out suggestions that don't have actual text changes
+        // Note: We allow suggestions where original is empty (insertions)
         const applicableSuggestions = this._currentReview.suggestions.filter(
             s => s.suggested && s.suggested.trim() !== '' &&
-                s.original && s.original.trim() !== '' &&
                 !this._appliedSuggestions.has(s.id)
         );
 

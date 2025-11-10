@@ -74,16 +74,16 @@ export class ReviewEngine {
                     const location = this._findTextLocation(fullContent || '', change.description, change.lineNumber);
 
                     // Note: _removeExcessiveModifiers removes both "很" and "非常" globally,
-                    // so the message should reflect that all degree adverbs will be removed
+                    // but the message should only mention the adverbs actually present in the text
                     const hasHen = text.includes('很');
                     const hasFeichang = text.includes('非常');
                     let reasonMessage = '减少程度副词的使用可以使文字更精炼';
                     if (hasHen && hasFeichang) {
                         reasonMessage = '减少"很"、"非常"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"和"非常"）';
                     } else if (hasHen) {
-                        reasonMessage = '减少"很"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"和"非常"）';
+                        reasonMessage = '减少"很"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"）';
                     } else if (hasFeichang) {
-                        reasonMessage = '减少"非常"等程度副词的使用可以使文字更精炼（将移除文本中所有"很"和"非常"）';
+                        reasonMessage = '减少"非常"等程度副词的使用可以使文字更精炼（将移除文本中所有"非常"）';
                     }
 
                     suggestions.push({
