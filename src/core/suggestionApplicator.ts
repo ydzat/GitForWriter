@@ -271,19 +271,21 @@ export class SuggestionApplicator {
             return true;
         }
 
-        // Check if suggestion path is a suffix of document path
-        // But ensure it's a complete path component (not just any suffix)
+        // Check if suggestion path is a suffix of document path by comparing path segments
+        // This is more robust than simple string suffix matching
         // For example: /path/to/file.md should match file.md or to/file.md
-        // but not match /different/file.md
-        //
-        // WARNING: Suffix matching could be ambiguous if multiple files with the same name
-        // exist in different directories. However, we allow it for better user experience
-        // when working with relative paths. The text validation in _validateSuggestion
-        // provides an additional safety check.
-        if (docPath.endsWith(suggPath)) {
-            // Ensure the character before the suffix is a path separator
-            const prefixLength = docPath.length - suggPath.length;
-            if (prefixLength === 0 || docPath[prefixLength - 1] === '/') {
+        // but NOT match /different/file.md or /path/to/myfile.md
+        const docSegments = docPath.split('/').filter(s => s.length > 0);
+        const suggSegments = suggPath.split('/').filter(s => s.length > 0);
+
+        if (suggSegments.length <= docSegments.length) {
+            // Get the last N segments from document path where N = suggestion segments length
+            const docSuffix = docSegments.slice(-suggSegments.length);
+
+            // Compare each segment for exact match
+            const allSegmentsMatch = docSuffix.every((seg, idx) => seg === suggSegments[idx]);
+
+            if (allSegmentsMatch) {
                 return true;
             }
         }
