@@ -8,7 +8,7 @@ import { DiffAnalyzer } from './ai/diff/diffAnalyzer';
 import { ReviewEngine } from './ai/review/reviewEngine';
 import { ExportManager } from './ai/export/exportManager';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     console.log('GitForWriter is now active');
 
     const gitManager = new GitManager();
@@ -16,6 +16,18 @@ export function activate(context: vscode.ExtensionContext) {
     const diffAnalyzer = new DiffAnalyzer();
     const reviewEngine = new ReviewEngine();
     const exportManager = new ExportManager();
+
+    // Initialize GitManager with workspace path
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder) {
+        try {
+            await gitManager.initialize(workspaceFolder.uri.fsPath);
+            console.log('GitManager initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize GitManager:', error);
+            vscode.window.showWarningMessage('GitForWriter: Failed to initialize Git. Some features may not work.');
+        }
+    }
 
     // Register commands
     const startProjectCommand = vscode.commands.registerCommand('gitforwriter.startProject', async () => {
