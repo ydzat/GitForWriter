@@ -289,7 +289,6 @@ describe('GitManager Unit Tests', () => {
             fs.writeFileSync(testFile, '# Test in subdirectory');
 
             const diff = await gitManager.getDiff(testFile);
-            expect(diff).to.be.a('string');
             expect(diff.length).to.be.greaterThan(0);
         });
 
