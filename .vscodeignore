@@ -1,8 +1,28 @@
-.vscode
-.vscode-test
-src
+# Development files
+.vscode/**
+.vscode-test/**
+src/**
 .gitignore
-.eslintrc.json
+.git/**
+
+# Build configuration
 tsconfig.json
-node_modules
-*.map
+.eslintrc.json
+**/*.map
+
+# Source files
+**/*.ts
+
+# Test files
+**/test/**
+
+# Coverage
+coverage/**
+.nyc_output/**
+
+# Documentation
+vsc-extension-quickstart.md
+
+# Misc
+.DS_Store
+*.vsix
