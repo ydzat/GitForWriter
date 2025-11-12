@@ -5,3 +5,5 @@ out
 .DS_Store
 coverage
 .nyc_output
+test-claude-manual.ts
+.env
