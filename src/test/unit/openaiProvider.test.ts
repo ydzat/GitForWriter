@@ -327,8 +327,8 @@ index 1234567..abcdefg 100644
             const result = await provider.analyzeDiff('+ test');
 
             expect(result.tokenUsage?.estimatedCost).to.exist;
-            // 150 tokens * 0.00003 = 0.0045
-            expect(result.tokenUsage?.estimatedCost).to.be.closeTo(0.0045, 0.0001);
+            // 100 prompt tokens * 0.00003 + 50 completion tokens * 0.00006 = 0.003 + 0.003 = 0.006
+            expect(result.tokenUsage?.estimatedCost).to.be.closeTo(0.006, 0.0001);
         });
 
         it('should estimate cost for gpt-3.5-turbo', async () => {
@@ -337,8 +337,8 @@ index 1234567..abcdefg 100644
 
             const result = await p.analyzeDiff('+ test');
 
-            // 150 tokens * 0.000002 = 0.0003
-            expect(result.tokenUsage?.estimatedCost).to.be.closeTo(0.0003, 0.0001);
+            // 100 prompt tokens * 0.0000015 + 50 completion tokens * 0.000002 = 0.00015 + 0.0001 = 0.00025
+            expect(result.tokenUsage?.estimatedCost).to.be.closeTo(0.00025, 0.00001);
         });
     });
 

@@ -9,9 +9,7 @@ import {
     Issue,
     AnalysisContext,
     ReviewContext,
-    TokenUsage,
-    SemanticChange,
-    ConsistencyReport
+    TokenUsage
 } from './aiProvider';
 
 /**
@@ -160,7 +158,7 @@ export class OpenAIProvider implements AIProvider {
                     promptTokens: usage?.prompt_tokens || 0,
                     completionTokens: usage?.completion_tokens || 0,
                     totalTokens: usage?.total_tokens || 0,
-                    estimatedCost: this.estimateCost(usage?.total_tokens || 0)
+                    estimatedCost: this.estimateCost(usage?.prompt_tokens || 0, usage?.completion_tokens || 0)
                 };
 
                 return { content, tokenUsage };
@@ -425,17 +423,18 @@ Respond ONLY with valid JSON.`;
 
     /**
      * Estimate cost based on token usage
+     * OpenAI charges different rates for input vs output tokens
      */
-    private estimateCost(totalTokens: number): number {
-        // Pricing as of 2024 (approximate)
-        const pricePerToken: Record<string, number> = {
-            'gpt-4': 0.00003, // $0.03 per 1K tokens (average of input/output)
-            'gpt-4-turbo': 0.00002, // $0.02 per 1K tokens
-            'gpt-3.5-turbo': 0.000002 // $0.002 per 1K tokens
+    private estimateCost(promptTokens: number, completionTokens: number): number {
+        // Pricing as of 2024 (per 1K tokens)
+        const pricePerToken: Record<string, { input: number; output: number }> = {
+            'gpt-4': { input: 0.00003, output: 0.00006 }, // $0.03 input, $0.06 output per 1K
+            'gpt-4-turbo': { input: 0.00001, output: 0.00003 }, // $0.01 input, $0.03 output per 1K
+            'gpt-3.5-turbo': { input: 0.0000015, output: 0.000002 } // $0.0015 input, $0.002 output per 1K
         };
 
-        const price = pricePerToken[this.model] || pricePerToken['gpt-4'];
-        return totalTokens * price;
+        const prices = pricePerToken[this.model] || pricePerToken['gpt-4'];
+        return (promptTokens * prices.input) + (completionTokens * prices.output);
     }
 
     /**
