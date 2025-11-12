@@ -111,7 +111,9 @@ describe('ConfigManager Unit Tests', () => {
 
             const result = validateAIConfig(config);
             expect(result.valid).to.be.false;
-            expect(result.errors.length).to.equal(2);
+            expect(result.errors.length).to.be.greaterThan(1);
+            expect(result.errors.some(e => e.includes('endpoint'))).to.be.true;
+            expect(result.errors.some(e => e.includes('model'))).to.be.true;
         });
     });
 });
