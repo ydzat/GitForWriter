@@ -1,8 +1,9 @@
 import { DiffAnalysis } from '../diff/diffAnalyzer';
-import { AIProvider, ReviewContext } from '../providers/aiProvider';
+import { AIProvider, ReviewContext, TextReview } from '../providers/aiProvider';
 import { ConfigManager } from '../../config/configManager';
 import { SecretManager } from '../../config/secretManager';
 import { v4 as uuidv4 } from 'uuid';
+import * as path from 'path';
 
 export interface Review {
     overall: string;
@@ -92,9 +93,20 @@ export class ReviewEngine {
         // Try AI-powered review first
         if (this.aiProvider && fullContent) {
             try {
+                // Detect document type from file extension
+                let documentType: 'markdown' | 'latex' = 'markdown';
+                if (filePath) {
+                    const ext = path.extname(filePath).toLowerCase();
+                    if (ext === '.tex') {
+                        documentType = 'latex';
+                    } else if (ext === '.md' || ext === '.markdown') {
+                        documentType = 'markdown';
+                    }
+                }
+
                 const context: ReviewContext = {
                     filePath,
-                    documentType: 'markdown',
+                    documentType,
                     writingStyle: 'formal'
                 };
 
@@ -117,7 +129,7 @@ export class ReviewEngine {
      * Convert AI provider's TextReview to our Review format
      */
     private convertAIReview(
-        aiReview: any,
+        aiReview: TextReview,
         analysis: DiffAnalysis,
         filePath?: string
     ): Review {
