@@ -15,7 +15,10 @@ export class SecretManager {
      * @param apiKey The OpenAI API key to store
      */
     async setOpenAIKey(apiKey: string): Promise<void> {
-        await this.secretStorage.store(SecretManager.OPENAI_KEY, apiKey);
+        if (!apiKey || apiKey.trim() === '') {
+            throw new Error('API key cannot be empty');
+        }
+        await this.secretStorage.store(SecretManager.OPENAI_KEY, apiKey.trim());
     }
 
     /**
@@ -31,7 +34,10 @@ export class SecretManager {
      * @param apiKey The Claude API key to store
      */
     async setClaudeKey(apiKey: string): Promise<void> {
-        await this.secretStorage.store(SecretManager.CLAUDE_KEY, apiKey);
+        if (!apiKey || apiKey.trim() === '') {
+            throw new Error('API key cannot be empty');
+        }
+        await this.secretStorage.store(SecretManager.CLAUDE_KEY, apiKey.trim());
     }
 
     /**

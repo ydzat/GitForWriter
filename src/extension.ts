@@ -269,10 +269,13 @@ async function setOpenAIAPIKey(secretManager: SecretManager) {
             if (!value || value.trim() === '') {
                 return 'API key cannot be empty';
             }
-            if (!value.startsWith('sk-')) {
+            if (!value.trim().startsWith('sk-')) {
                 return 'OpenAI API keys typically start with "sk-"';
             }
-            return null;
+            if (value.trim().length <= 3) {
+                return 'API key appears to be incomplete';
+            }
+            return undefined;
         }
     });
 
@@ -291,10 +294,13 @@ async function setClaudeAPIKey(secretManager: SecretManager) {
             if (!value || value.trim() === '') {
                 return 'API key cannot be empty';
             }
-            if (!value.startsWith('sk-ant-')) {
+            if (!value.trim().startsWith('sk-ant-')) {
                 return 'Claude API keys typically start with "sk-ant-"';
             }
-            return null;
+            if (value.trim().length <= 7) {
+                return 'API key appears to be incomplete';
+            }
+            return undefined;
         }
     });
 
