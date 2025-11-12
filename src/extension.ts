@@ -18,7 +18,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const secretManager = new SecretManager(context.secrets);
     const configManager = new ConfigManager();
     const diffAnalyzer = new DiffAnalyzer(configManager, secretManager);
-    const reviewEngine = new ReviewEngine();
+    const reviewEngine = new ReviewEngine(configManager, secretManager);
     const exportManager = new ExportManager();
 
     // Initialize GitManager with workspace path
