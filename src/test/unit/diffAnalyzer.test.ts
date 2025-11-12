@@ -1,11 +1,31 @@
 import { expect } from 'chai';
 import { DiffAnalyzer } from '../../ai/diff/diffAnalyzer';
+import { ConfigManager } from '../../config/configManager';
+import { SecretManager } from '../../config/secretManager';
 
 describe('DiffAnalyzer Unit Tests', () => {
     let diffAnalyzer: DiffAnalyzer;
+    let mockConfigManager: ConfigManager;
+    let mockSecretManager: SecretManager;
 
     beforeEach(() => {
-        diffAnalyzer = new DiffAnalyzer();
+        // Create mock ConfigManager
+        mockConfigManager = {
+            getConfig: () => ({
+                provider: 'openai',
+                openai: { model: 'gpt-4' },
+                claude: { model: 'claude-3-sonnet' },
+                local: { endpoint: 'http://localhost:11434', model: 'llama2' }
+            })
+        } as any;
+
+        // Create mock SecretManager that returns no API keys (forces fallback)
+        mockSecretManager = {
+            getOpenAIKey: async () => undefined,
+            getClaudeKey: async () => undefined
+        } as any;
+
+        diffAnalyzer = new DiffAnalyzer(mockConfigManager, mockSecretManager);
     });
 
     describe('analyze()', () => {

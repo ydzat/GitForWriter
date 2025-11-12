@@ -1,34 +1,103 @@
-export interface DiffAnalysis {
-    summary: string;
-    additions: number;
-    deletions: number;
-    modifications: number;
-    semanticChanges: SemanticChange[];
-    consistencyReport: ConsistencyReport;
-}
+import { AIProvider, AIProviderError, AnalysisContext } from '../providers/aiProvider';
+import { ConfigManager } from '../../config/configManager';
+import { SecretManager } from '../../config/secretManager';
 
-export interface SemanticChange {
-    type: 'addition' | 'deletion' | 'modification';
-    description: string;
-    lineNumber: number;
-    confidence: number;
-}
-
-export interface ConsistencyReport {
-    score: number; // 0-100
-    issues: string[];
-    suggestions: string[];
-}
+// Re-export types from aiProvider for backward compatibility
+export type { DiffAnalysis, SemanticChange, ConsistencyReport } from '../providers/aiProvider';
 
 export class DiffAnalyzer {
-    async analyze(diff: string, fullContent: string): Promise<DiffAnalysis> {
+    private aiProvider: AIProvider | null = null;
+    private initializationPromise: Promise<void> | null = null;
+
+    constructor(
+        private configManager: ConfigManager,
+        private secretManager: SecretManager
+    ) {
+        // Initialize provider asynchronously
+        this.initializationPromise = this.initializeProvider();
+    }
+
+    /**
+     * Initialize AI provider based on configuration
+     */
+    private async initializeProvider(): Promise<void> {
+        try {
+            const config = this.configManager.getConfig();
+            const provider = config.provider;
+
+            if (provider === 'openai') {
+                const apiKey = await this.secretManager.getOpenAIKey();
+                if (!apiKey) {
+                    console.warn('OpenAI API key not found, will use fallback analysis');
+                    return;
+                }
+                const { OpenAIProvider } = await import('../providers/openaiProvider');
+                this.aiProvider = new OpenAIProvider({
+                    apiKey,
+                    model: config.openai.model
+                });
+            } else if (provider === 'claude') {
+                const apiKey = await this.secretManager.getClaudeKey();
+                if (!apiKey) {
+                    console.warn('Claude API key not found, will use fallback analysis');
+                    return;
+                }
+                const { ClaudeProvider } = await import('../providers/claudeProvider');
+                this.aiProvider = new ClaudeProvider({
+                    apiKey,
+                    model: config.claude.model
+                });
+            } else {
+                console.warn(`Unsupported AI provider: ${provider}, will use fallback analysis`);
+            }
+        } catch (error) {
+            console.error('Failed to initialize AI provider:', error);
+            this.aiProvider = null;
+        }
+    }
+
+    /**
+     * Analyze diff using AI provider with fallback to rule-based analysis
+     */
+    async analyze(diff: string, fullContent: string): Promise<import('../providers/aiProvider').DiffAnalysis> {
+        // Wait for provider initialization
+        if (this.initializationPromise) {
+            await this.initializationPromise;
+            this.initializationPromise = null;
+        }
+
+        // Try AI-powered analysis first
+        if (this.aiProvider) {
+            try {
+                const context: AnalysisContext = {
+                    documentType: 'markdown',
+                    fullContent
+                };
+
+                const result = await this.aiProvider.analyzeDiff(diff, context);
+                console.log('AI analysis completed successfully');
+                return result.data;
+            } catch (error) {
+                console.warn('AI analysis failed, falling back to rule-based analysis:', error);
+                // Fall through to fallback analysis
+            }
+        }
+
+        // Fallback to rule-based analysis
+        return this.fallbackAnalyze(diff, fullContent);
+    }
+
+    /**
+     * Rule-based fallback analysis (original implementation)
+     */
+    private fallbackAnalyze(diff: string, fullContent: string): import('../providers/aiProvider').DiffAnalysis {
         // Parse diff to extract changes
         const lines = diff.split('\n');
         let additions = 0;
         let deletions = 0;
         let modifications = 0;
 
-        const semanticChanges: SemanticChange[] = [];
+        const semanticChanges: import('../providers/aiProvider').SemanticChange[] = [];
         let currentLine = 0;
 
         for (const line of lines) {
@@ -97,9 +166,12 @@ export class DiffAnalyzer {
         };
     }
 
+    /**
+     * Generate semantic description for a line (used in fallback)
+     */
     private generateSemanticDescription(line: string): string {
         const trimmed = line.trim();
-        
+
         if (trimmed.length === 0) {
             return 'Empty line change';
         }
@@ -118,14 +190,17 @@ export class DiffAnalyzer {
         }
     }
 
-    private generateConsistencyReport(content: string, changes: SemanticChange[]): ConsistencyReport {
+    /**
+     * Generate consistency report (used in fallback)
+     */
+    private generateConsistencyReport(content: string, changes: import('../providers/aiProvider').SemanticChange[]): import('../providers/aiProvider').ConsistencyReport {
         const issues: string[] = [];
         const suggestions: string[] = [];
         let score = 100;
 
         // Check for common writing issues
         const sentences = content.split(/[.!?]+/);
-        
+
         // Check sentence length
         const longSentences = sentences.filter(s => s.trim().split(/\s+/).length > 30);
         if (longSentences.length > sentences.length * 0.2) {
@@ -147,7 +222,7 @@ export class DiffAnalyzer {
             .filter(c => c.type === 'addition')
             .map(c => c.description)
             .join(' ');
-        
+
         const words = addedText.toLowerCase().split(/\s+/);
         const wordFreq: Record<string, number> = {};
         for (const word of words) {
@@ -170,11 +245,14 @@ export class DiffAnalyzer {
         };
     }
 
+    /**
+     * Generate summary (used in fallback)
+     */
     private generateSummary(
         additions: number,
         deletions: number,
         modifications: number,
-        changes: SemanticChange[]
+        changes: import('../providers/aiProvider').SemanticChange[]
     ): string {
         const parts: string[] = [];
 
