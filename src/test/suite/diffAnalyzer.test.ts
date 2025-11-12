@@ -1,11 +1,31 @@
 import * as assert from 'assert';
 import { DiffAnalyzer } from '../../ai/diff/diffAnalyzer';
+import { ConfigManager } from '../../config/configManager';
+import { SecretManager } from '../../config/secretManager';
 
 suite('DiffAnalyzer Test Suite', () => {
     let diffAnalyzer: DiffAnalyzer;
+    let mockConfigManager: ConfigManager;
+    let mockSecretManager: SecretManager;
 
     setup(() => {
-        diffAnalyzer = new DiffAnalyzer();
+        // Create mock ConfigManager
+        mockConfigManager = {
+            getConfig: () => ({
+                provider: 'openai',
+                openai: { model: 'gpt-4' },
+                claude: { model: 'claude-3-sonnet' },
+                local: { endpoint: 'http://localhost:11434', model: 'llama2' }
+            })
+        } as any;
+
+        // Create mock SecretManager that returns no API keys (forces fallback)
+        mockSecretManager = {
+            getOpenAIKey: async () => undefined,
+            getClaudeKey: async () => undefined
+        } as any;
+
+        diffAnalyzer = new DiffAnalyzer(mockConfigManager, mockSecretManager);
     });
 
     test('should analyze simple addition', async () => {
