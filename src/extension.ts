@@ -7,6 +7,8 @@ import { AIReviewPanel } from './webview/aiReviewPanel';
 import { DiffAnalyzer } from './ai/diff/diffAnalyzer';
 import { ReviewEngine } from './ai/review/reviewEngine';
 import { ExportManager } from './ai/export/exportManager';
+import { SecretManager } from './config/secretManager';
+import { ConfigManager } from './config/configManager';
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('GitForWriter is now active');
@@ -16,6 +18,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const diffAnalyzer = new DiffAnalyzer();
     const reviewEngine = new ReviewEngine();
     const exportManager = new ExportManager();
+    const secretManager = new SecretManager(context.secrets);
+    const configManager = new ConfigManager();
 
     // Initialize GitManager with workspace path
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -42,6 +46,26 @@ export async function activate(context: vscode.ExtensionContext) {
         await exportDraft(exportManager);
     });
 
+    // Configure AI Provider command
+    const configureProviderCommand = vscode.commands.registerCommand('gitforwriter.configureProvider', async () => {
+        await configureAIProvider(configManager);
+    });
+
+    // Set OpenAI API Key command
+    const setOpenAIKeyCommand = vscode.commands.registerCommand('gitforwriter.setOpenAIKey', async () => {
+        await setOpenAIAPIKey(secretManager);
+    });
+
+    // Set Claude API Key command
+    const setClaudeKeyCommand = vscode.commands.registerCommand('gitforwriter.setClaudeKey', async () => {
+        await setClaudeAPIKey(secretManager);
+    });
+
+    // Clear API Keys command
+    const clearKeysCommand = vscode.commands.registerCommand('gitforwriter.clearAPIKeys', async () => {
+        await clearAPIKeys(secretManager);
+    });
+
     // Register document save handler
     const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
         await handleDocumentSave(document, gitManager, diffAnalyzer);
@@ -51,6 +75,10 @@ export async function activate(context: vscode.ExtensionContext) {
         startProjectCommand,
         aiReviewCommand,
         exportDraftCommand,
+        configureProviderCommand,
+        setOpenAIKeyCommand,
+        setClaudeKeyCommand,
+        clearKeysCommand,
         saveHandler,
         statusBarManager
     );
@@ -213,6 +241,85 @@ async function handleDocumentSave(
         console.log(`Diff saved: ${diffPath}`);
     } catch (error) {
         console.error('Failed to handle document save:', error);
+    }
+}
+
+async function configureAIProvider(configManager: ConfigManager) {
+    const provider = await vscode.window.showQuickPick(
+        [
+            { label: 'OpenAI', value: 'openai' as const, description: 'Use OpenAI GPT models' },
+            { label: 'Claude (Anthropic)', value: 'claude' as const, description: 'Use Anthropic Claude models' },
+            { label: 'Local LLM', value: 'local' as const, description: 'Use local LLM (e.g., Ollama)' }
+        ],
+        { placeHolder: 'Select AI provider' }
+    );
+
+    if (provider) {
+        await configManager.setProvider(provider.value);
+        vscode.window.showInformationMessage(`✅ AI provider set to: ${provider.label}`);
+    }
+}
+
+async function setOpenAIAPIKey(secretManager: SecretManager) {
+    const apiKey = await vscode.window.showInputBox({
+        prompt: 'Enter your OpenAI API key',
+        password: true,
+        placeHolder: 'sk-...',
+        validateInput: (value) => {
+            if (!value || value.trim() === '') {
+                return 'API key cannot be empty';
+            }
+            if (!value.trim().startsWith('sk-')) {
+                return 'OpenAI API keys typically start with "sk-"';
+            }
+            if (value.trim().length <= 3) {
+                return 'API key appears to be incomplete';
+            }
+            return undefined;
+        }
+    });
+
+    if (apiKey) {
+        await secretManager.setOpenAIKey(apiKey);
+        vscode.window.showInformationMessage('✅ OpenAI API key saved securely');
+    }
+}
+
+async function setClaudeAPIKey(secretManager: SecretManager) {
+    const apiKey = await vscode.window.showInputBox({
+        prompt: 'Enter your Claude API key',
+        password: true,
+        placeHolder: 'sk-ant-...',
+        validateInput: (value) => {
+            if (!value || value.trim() === '') {
+                return 'API key cannot be empty';
+            }
+            if (!value.trim().startsWith('sk-ant-')) {
+                return 'Claude API keys typically start with "sk-ant-"';
+            }
+            if (value.trim().length <= 7) {
+                return 'API key appears to be incomplete';
+            }
+            return undefined;
+        }
+    });
+
+    if (apiKey) {
+        await secretManager.setClaudeKey(apiKey);
+        vscode.window.showInformationMessage('✅ Claude API key saved securely');
+    }
+}
+
+async function clearAPIKeys(secretManager: SecretManager) {
+    const confirm = await vscode.window.showWarningMessage(
+        'Are you sure you want to clear all API keys?',
+        { modal: true },
+        'Yes', 'No'
+    );
+
+    if (confirm === 'Yes') {
+        await secretManager.clearAllKeys();
+        vscode.window.showInformationMessage('✅ All API keys cleared');
     }
 }
 
