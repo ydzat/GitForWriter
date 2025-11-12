@@ -36,7 +36,12 @@ export class OpenAIProvider implements AIProvider {
             throw new AIProviderError('OpenAI API key is required', 'INVALID_API_KEY');
         }
 
-        const clientConfig: any = {
+        const clientConfig: {
+            apiKey: string;
+            maxRetries?: number;
+            timeout?: number;
+            baseURL?: string;
+        } = {
             apiKey: config.apiKey,
             maxRetries: config.maxRetries ?? 3,
             timeout: config.timeout ?? 60000 // 60 seconds

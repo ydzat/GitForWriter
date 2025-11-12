@@ -1,5 +1,5 @@
 import { DiffAnalysis } from '../diff/diffAnalyzer';
-import { AIProvider, ReviewContext, TextReview } from '../providers/aiProvider';
+import { AIProvider, ReviewContext, TextReview, Suggestion } from '../providers/aiProvider';
 import { ConfigManager } from '../../config/configManager';
 import { SecretManager } from '../../config/secretManager';
 import { v4 as uuidv4 } from 'uuid';
@@ -55,13 +55,11 @@ export class ReviewEngine {
                     return;
                 }
                 const { OpenAIProvider } = await import('../providers/openaiProvider');
-                const providerConfig: any = {
+                const providerConfig = {
                     apiKey,
-                    model: config.openai.model
+                    model: config.openai.model,
+                    ...(config.openai.baseURL && { baseURL: config.openai.baseURL })
                 };
-                if (config.openai.baseURL) {
-                    providerConfig.baseURL = config.openai.baseURL;
-                }
                 this.aiProvider = new OpenAIProvider(providerConfig);
             } else if (provider === 'claude') {
                 const apiKey = await this.secretManager.getClaudeKey();
@@ -127,6 +125,9 @@ export class ReviewEngine {
 
     /**
      * Convert AI provider's TextReview to our Review format
+     * @param aiReview - AI review result
+     * @param analysis - Diff analysis (reserved for future use, e.g., merging AI suggestions with diff-based suggestions)
+     * @param filePath - Optional file path
      */
     private convertAIReview(
         aiReview: TextReview,
@@ -134,7 +135,7 @@ export class ReviewEngine {
         filePath?: string
     ): Review {
         // Convert AI suggestions to our ReviewSuggestion format
-        const suggestions: ReviewSuggestion[] = (aiReview.suggestions || []).map((s: any) => ({
+        const suggestions: ReviewSuggestion[] = (aiReview.suggestions || []).map((s: Suggestion) => ({
             id: s.id || this._generateId(),
             type: this.mapSuggestionType(s.type),
             line: s.line || 0,
