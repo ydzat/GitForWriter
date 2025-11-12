@@ -86,15 +86,20 @@ All tests pass, including:
 - 3 new AI integration tests
 - All other existing tests remain passing
 
-## 🔄 Backward Compatibility
+## 🔄 API Changes
 
-### Public API - UNCHANGED ✅
+### Constructor Signature Changed ⚠️
 ```typescript
-// Before and After - Same interface
+// Before (no-argument constructor):
+// const analyzer = new DiffAnalyzer();
+
+// After (requires dependencies):
 const analyzer = new DiffAnalyzer(configManager, secretManager);
 const analysis = await analyzer.analyze(diff, fullContent);
 const quick = await analyzer.quickAnalyze(diff);
 ```
+
+**Note**: This is a breaking change for the constructor, but since `DiffAnalyzer` is only instantiated in `extension.ts` (not part of the public extension API), this doesn't affect end users. The `analyze()` and `quickAnalyze()` method signatures remain unchanged.
 
 ### Return Types - ENHANCED ✅
 ```typescript

@@ -1,9 +1,10 @@
-import { AIProvider, AIProviderError, AnalysisContext } from '../providers/aiProvider';
+import { AIProvider, AnalysisContext } from '../providers/aiProvider';
 import { ConfigManager } from '../../config/configManager';
 import { SecretManager } from '../../config/secretManager';
 
 // Re-export types from aiProvider for backward compatibility
 export type { DiffAnalysis, SemanticChange, ConsistencyReport } from '../providers/aiProvider';
+import type { DiffAnalysis, SemanticChange, ConsistencyReport } from '../providers/aiProvider';
 
 export class DiffAnalyzer {
     private aiProvider: AIProvider | null = null;
@@ -59,11 +60,12 @@ export class DiffAnalyzer {
     /**
      * Analyze diff using AI provider with fallback to rule-based analysis
      */
-    async analyze(diff: string, fullContent: string): Promise<import('../providers/aiProvider').DiffAnalysis> {
+    async analyze(diff: string, fullContent: string): Promise<DiffAnalysis> {
         // Wait for provider initialization
         if (this.initializationPromise) {
-            await this.initializationPromise;
+            const promise = this.initializationPromise;
             this.initializationPromise = null;
+            await promise;
         }
 
         // Try AI-powered analysis first
@@ -90,14 +92,14 @@ export class DiffAnalyzer {
     /**
      * Rule-based fallback analysis (original implementation)
      */
-    private fallbackAnalyze(diff: string, fullContent: string): import('../providers/aiProvider').DiffAnalysis {
+    private fallbackAnalyze(diff: string, fullContent: string): DiffAnalysis {
         // Parse diff to extract changes
         const lines = diff.split('\n');
         let additions = 0;
         let deletions = 0;
         let modifications = 0;
 
-        const semanticChanges: import('../providers/aiProvider').SemanticChange[] = [];
+        const semanticChanges: SemanticChange[] = [];
         let currentLine = 0;
 
         for (const line of lines) {
@@ -193,7 +195,7 @@ export class DiffAnalyzer {
     /**
      * Generate consistency report (used in fallback)
      */
-    private generateConsistencyReport(content: string, changes: import('../providers/aiProvider').SemanticChange[]): import('../providers/aiProvider').ConsistencyReport {
+    private generateConsistencyReport(content: string, changes: SemanticChange[]): ConsistencyReport {
         const issues: string[] = [];
         const suggestions: string[] = [];
         let score = 100;
@@ -252,7 +254,7 @@ export class DiffAnalyzer {
         additions: number,
         deletions: number,
         modifications: number,
-        changes: import('../providers/aiProvider').SemanticChange[]
+        changes: SemanticChange[]
     ): string {
         const parts: string[] = [];
 
