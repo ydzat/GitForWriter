@@ -16,11 +16,12 @@ export class ConfigManager {
      */
     getConfig(): AIConfig {
         const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_SECTION);
-        
+
         return {
             provider: config.get<AIProvider>('aiProvider', 'openai'),
             openai: {
-                model: config.get<string>('openai.model', 'gpt-4')
+                model: config.get<string>('openai.model', 'gpt-4'),
+                baseURL: config.get<string>('openai.baseURL')
             },
             claude: {
                 model: config.get<string>('claude.model', 'claude-3-sonnet')

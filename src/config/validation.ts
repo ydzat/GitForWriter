@@ -10,6 +10,7 @@ export interface AIConfig {
     provider: AIProvider;
     openai: {
         model: string;
+        baseURL?: string; // Support for OpenAI-compatible APIs
     };
     claude: {
         model: string;
