@@ -60,8 +60,10 @@ export class SecretManager {
      * Clear all stored API keys
      */
     async clearAllKeys(): Promise<void> {
-        await this.deleteOpenAIKey();
-        await this.deleteClaudeKey();
+        await Promise.all([
+            this.deleteOpenAIKey(),
+            this.deleteClaudeKey()
+        ]);
     }
 
     /**

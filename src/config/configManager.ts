@@ -1,34 +1,8 @@
 import * as vscode from 'vscode';
+import { AIProvider, AIConfig, ValidationResult, validateAIConfig } from './validation';
 
-/**
- * Supported AI providers
- */
-export type AIProvider = 'openai' | 'claude' | 'local';
-
-/**
- * AI configuration interface
- */
-export interface AIConfig {
-    provider: AIProvider;
-    openai: {
-        model: string;
-    };
-    claude: {
-        model: string;
-    };
-    local: {
-        endpoint: string;
-        model: string;
-    };
-}
-
-/**
- * Configuration validation result
- */
-export interface ValidationResult {
-    valid: boolean;
-    errors: string[];
-}
+// Re-export types for convenience
+export { AIProvider, AIConfig, ValidationResult, validateAIConfig };
 
 /**
  * ConfigManager handles reading and validating VSCode configuration settings
@@ -124,27 +98,7 @@ export class ConfigManager {
      * @returns Validation result with errors if any
      */
     validateConfig(config: AIConfig): ValidationResult {
-        const errors: string[] = [];
-
-        // Validate provider
-        if (!['openai', 'claude', 'local'].includes(config.provider)) {
-            errors.push(`Invalid AI provider: ${config.provider}`);
-        }
-
-        // Validate local provider specific settings
-        if (config.provider === 'local') {
-            if (!config.local.endpoint || config.local.endpoint.trim() === '') {
-                errors.push('Local LLM endpoint is required when using local provider');
-            }
-            if (!config.local.model || config.local.model.trim() === '') {
-                errors.push('Local LLM model name is required when using local provider');
-            }
-        }
-
-        return {
-            valid: errors.length === 0,
-            errors
-        };
+        return validateAIConfig(config);
     }
 
     /**
