@@ -102,7 +102,7 @@
             "deepseek-chat"
           ],
           "default": "gpt-4",
-          "description": "OpenAI model to use (or compatible model name)"
+          "description": "OpenAI model to use. For OpenAI-compatible APIs with custom baseURL, you can manually enter any model name in your workspace settings.json file (e.g., 'deepseek-chat', 'qwen-plus'). The enum provides common options for auto-completion."
         },
         "gitforwriter.openai.baseURL": {
           "type": "string",

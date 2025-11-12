@@ -12,13 +12,13 @@ import { SecretManager } from './config/secretManager';
 import { ConfigManager } from './config/configManager';
 
 export async function activate(context: vscode.ExtensionContext) {
-    // Load .env file for development/testing
+    // Load .env file for development/testing ONLY
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (workspaceFolder) {
+    if (workspaceFolder && context.extensionMode === vscode.ExtensionMode.Development) {
         const envPath = path.join(workspaceFolder.uri.fsPath, '.env');
         if (fs.existsSync(envPath)) {
             dotenv.config({ path: envPath });
-            console.log('Loaded .env file from workspace');
+            console.warn('⚠️ Loaded .env file from workspace (development mode only)');
         }
     }
 

@@ -87,11 +87,7 @@ export class ReviewEngine {
      */
     async generateReview(analysis: DiffAnalysis, filePath?: string, fullContent?: string): Promise<Review> {
         // Wait for provider initialization
-        if (this.initializationPromise) {
-            const promise = this.initializationPromise;
-            this.initializationPromise = null;
-            await promise;
-        }
+        await this.initializationPromise;
 
         // Try AI-powered review first
         if (this.aiProvider && fullContent) {

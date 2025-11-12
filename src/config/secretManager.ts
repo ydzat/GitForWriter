@@ -32,10 +32,13 @@ export class SecretManager {
             return storedKey;
         }
 
-        // Fallback to environment variable for development/testing
-        // This allows using .env file with API_KEY variable
+        // Fallback to environment variable for development/testing ONLY.
+        // WARNING: This allows using a .env file with API_KEY variable, but environment variables
+        // in VS Code extensions are less secure than SecretStorage.
+        // Do NOT use this method in production. API keys in environment variables may be exposed
+        // to other processes or users.
         if (process.env.API_KEY) {
-            console.log('Using API key from environment variable (development mode)');
+            console.warn('⚠️ Using API key from environment variable (development mode only)');
             return process.env.API_KEY;
         }
 
