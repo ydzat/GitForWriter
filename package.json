@@ -47,6 +47,22 @@
       {
         "command": "gitforwriter.exportDraft",
         "title": "GitForWriter: Export Draft"
+      },
+      {
+        "command": "gitforwriter.configureProvider",
+        "title": "GitForWriter: Configure AI Provider"
+      },
+      {
+        "command": "gitforwriter.setOpenAIKey",
+        "title": "GitForWriter: Set OpenAI API Key"
+      },
+      {
+        "command": "gitforwriter.setClaudeKey",
+        "title": "GitForWriter: Set Claude API Key"
+      },
+      {
+        "command": "gitforwriter.clearAPIKeys",
+        "title": "GitForWriter: Clear API Keys"
       }
     ],
     "configuration": {
@@ -66,6 +82,46 @@
           ],
           "default": "markdown",
           "description": "Default export format"
+        },
+        "gitforwriter.aiProvider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "claude",
+            "local"
+          ],
+          "default": "openai",
+          "description": "AI provider to use for analysis and review"
+        },
+        "gitforwriter.openai.model": {
+          "type": "string",
+          "enum": [
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo"
+          ],
+          "default": "gpt-4",
+          "description": "OpenAI model to use"
+        },
+        "gitforwriter.claude.model": {
+          "type": "string",
+          "enum": [
+            "claude-3-opus",
+            "claude-3-sonnet",
+            "claude-3-haiku"
+          ],
+          "default": "claude-3-sonnet",
+          "description": "Claude model to use"
+        },
+        "gitforwriter.local.endpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Local LLM endpoint URL (e.g., Ollama)"
+        },
+        "gitforwriter.local.model": {
+          "type": "string",
+          "default": "llama2",
+          "description": "Local LLM model name"
         }
       }
     }
