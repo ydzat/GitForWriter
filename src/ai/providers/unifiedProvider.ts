@@ -456,16 +456,19 @@ Respond ONLY with valid JSON.`;
             let deletions = 0;
 
             for (const line of lines) {
-                // Skip diff metadata and context lines
+                // Skip diff metadata
                 if (
                     line.startsWith('+++') ||
                     line.startsWith('---') ||
                     line.startsWith('@@') ||
                     line.startsWith('diff ') ||
-                    line.startsWith('index ') ||
-                    line.startsWith(' ') || // context lines start with a space
-                    line.trim() === ''
+                    line.startsWith('index ')
                 ) {
+                    continue;
+                }
+
+                // Skip context lines (start with space) and empty lines
+                if (line.startsWith(' ') || line.trim() === '') {
                     continue;
                 }
 

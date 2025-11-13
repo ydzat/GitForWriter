@@ -91,7 +91,7 @@
             "claude",
             "local"
           ],
-          "default": "unified",
+          "default": "openai",
           "description": "AI provider to use for analysis and review. 'unified' provides access to 100+ LLM providers through Vercel AI SDK."
         },
         "gitforwriter.unified.provider": {
