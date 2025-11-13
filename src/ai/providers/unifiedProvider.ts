@@ -1,5 +1,6 @@
 import { generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import {
     AIProvider,
@@ -46,11 +47,22 @@ export class UnifiedProvider implements AIProvider {
 
         // Initialize provider based on type
         if (config.provider === 'openai') {
-            this.provider = createOpenAI({
-                apiKey: config.apiKey,
-                baseURL: config.baseURL
-            });
-            this.model = this.provider(config.model);
+            // Use OpenAI-compatible provider if baseURL is provided (for DeepSeek, etc.)
+            if (config.baseURL) {
+                const fullBaseURL = config.baseURL.endsWith('/v1') ? config.baseURL : `${config.baseURL}/v1`;
+                this.provider = createOpenAICompatible({
+                    name: 'openai-compatible',
+                    apiKey: config.apiKey,
+                    baseURL: fullBaseURL
+                });
+                this.model = this.provider.chatModel(config.model);
+            } else {
+                // Use official OpenAI provider
+                this.provider = createOpenAI({
+                    apiKey: config.apiKey
+                });
+                this.model = this.provider(config.model);
+            }
         } else if (config.provider === 'anthropic') {
             this.provider = createAnthropic({
                 apiKey: config.apiKey
@@ -354,11 +366,28 @@ Respond ONLY with valid JSON.`;
     }
 
     /**
+     * Clean markdown code blocks from response
+     */
+    private cleanMarkdownCodeBlocks(content: string): string {
+        // Remove markdown code block markers (```json ... ``` or ``` ... ```)
+        let cleaned = content.trim();
+
+        // Remove opening code block marker
+        cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '');
+
+        // Remove closing code block marker
+        cleaned = cleaned.replace(/\n?```\s*$/i, '');
+
+        return cleaned.trim();
+    }
+
+    /**
      * Parse diff analysis response
      */
     private parseDiffAnalysis(content: string, originalDiff: string): DiffAnalysis {
         try {
-            const parsed = JSON.parse(content);
+            const cleanedContent = this.cleanMarkdownCodeBlocks(content);
+            const parsed = JSON.parse(cleanedContent);
 
             // Calculate basic stats from diff if not provided
             const lines = originalDiff.split('\n');
@@ -400,7 +429,8 @@ Respond ONLY with valid JSON.`;
      */
     private parseTextReview(content: string): TextReview {
         try {
-            const parsed = JSON.parse(content);
+            const cleanedContent = this.cleanMarkdownCodeBlocks(content);
+            const parsed = JSON.parse(cleanedContent);
 
             return {
                 overall: parsed.overall || '整体质量良好',
@@ -420,7 +450,8 @@ Respond ONLY with valid JSON.`;
      */
     private parseSuggestions(content: string): Suggestion[] {
         try {
-            const parsed = JSON.parse(content);
+            const cleanedContent = this.cleanMarkdownCodeBlocks(content);
+            const parsed = JSON.parse(cleanedContent);
             return parsed.suggestions || [];
         } catch (error) {
             throw new AIProviderError('Failed to parse suggestions response', 'PARSE_ERROR', undefined, error as Error);
