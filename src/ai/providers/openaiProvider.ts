@@ -20,6 +20,7 @@ export interface OpenAIConfig {
     model: string;
     maxRetries?: number;
     timeout?: number;
+    baseURL?: string; // Support for OpenAI-compatible APIs (e.g., DeepSeek)
 }
 
 /**
@@ -35,11 +36,23 @@ export class OpenAIProvider implements AIProvider {
             throw new AIProviderError('OpenAI API key is required', 'INVALID_API_KEY');
         }
 
-        this.client = new OpenAI({
+        const clientConfig: {
+            apiKey: string;
+            maxRetries?: number;
+            timeout?: number;
+            baseURL?: string;
+        } = {
             apiKey: config.apiKey,
             maxRetries: config.maxRetries ?? 3,
             timeout: config.timeout ?? 60000 // 60 seconds
-        });
+        };
+
+        // Support for OpenAI-compatible APIs (e.g., DeepSeek)
+        if (config.baseURL) {
+            clientConfig.baseURL = config.baseURL;
+        }
+
+        this.client = new OpenAI(clientConfig);
 
         this.model = config.model || 'gpt-4';
         this.maxRetries = config.maxRetries ?? 3;

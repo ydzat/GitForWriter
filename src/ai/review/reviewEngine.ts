@@ -1,5 +1,9 @@
 import { DiffAnalysis } from '../diff/diffAnalyzer';
+import { AIProvider, ReviewContext, TextReview, Suggestion } from '../providers/aiProvider';
+import { ConfigManager } from '../../config/configManager';
+import { SecretManager } from '../../config/secretManager';
 import { v4 as uuidv4 } from 'uuid';
+import * as path from 'path';
 
 export interface Review {
     overall: string;
@@ -25,14 +29,161 @@ export interface ReviewSuggestion {
 }
 
 export class ReviewEngine {
+    private aiProvider: AIProvider | null = null;
+    private initializationPromise: Promise<void> | null = null;
+
+    constructor(
+        private configManager: ConfigManager,
+        private secretManager: SecretManager
+    ) {
+        // Initialize provider asynchronously
+        this.initializationPromise = this.initializeProvider();
+    }
+
+    /**
+     * Initialize AI provider based on configuration
+     */
+    private async initializeProvider(): Promise<void> {
+        try {
+            const config = this.configManager.getConfig();
+            const provider = config.provider;
+
+            if (provider === 'openai') {
+                const apiKey = await this.secretManager.getOpenAIKey();
+                if (!apiKey) {
+                    console.warn('OpenAI API key not found, will use fallback review');
+                    return;
+                }
+                const { OpenAIProvider } = await import('../providers/openaiProvider');
+                const providerConfig = {
+                    apiKey,
+                    model: config.openai.model,
+                    ...(config.openai.baseURL && { baseURL: config.openai.baseURL })
+                };
+                this.aiProvider = new OpenAIProvider(providerConfig);
+            } else if (provider === 'claude') {
+                const apiKey = await this.secretManager.getClaudeKey();
+                if (!apiKey) {
+                    console.warn('Claude API key not found, will use fallback review');
+                    return;
+                }
+                const { ClaudeProvider } = await import('../providers/claudeProvider');
+                this.aiProvider = new ClaudeProvider({
+                    apiKey,
+                    model: config.claude.model
+                });
+            } else {
+                console.warn(`Unsupported AI provider: ${provider}, will use fallback review`);
+            }
+        } catch (error) {
+            console.error('Failed to initialize AI provider:', error);
+            this.aiProvider = null;
+        }
+    }
+
+    /**
+     * Generate review using AI provider with fallback to rule-based review
+     */
     async generateReview(analysis: DiffAnalysis, filePath?: string, fullContent?: string): Promise<Review> {
+        // Wait for provider initialization
+        await this.initializationPromise;
+
+        // Try AI-powered review first
+        if (this.aiProvider && fullContent) {
+            try {
+                // Detect document type from file extension
+                let documentType: 'markdown' | 'latex' = 'markdown';
+                if (filePath) {
+                    const ext = path.extname(filePath).toLowerCase();
+                    if (ext === '.tex') {
+                        documentType = 'latex';
+                    } else if (ext === '.md' || ext === '.markdown') {
+                        documentType = 'markdown';
+                    }
+                }
+
+                const context: ReviewContext = {
+                    filePath,
+                    documentType,
+                    writingStyle: 'formal'
+                };
+
+                const result = await this.aiProvider.reviewText(fullContent, context);
+                console.log('AI review completed successfully');
+
+                // Convert AI review to our Review format
+                return this.convertAIReview(result.data, analysis, filePath);
+            } catch (error) {
+                console.warn('AI review failed, falling back to rule-based review:', error);
+                // Fall through to fallback review
+            }
+        }
+
+        // Fallback to rule-based review
+        return this.fallbackGenerateReview(analysis, filePath, fullContent);
+    }
+
+    /**
+     * Convert AI provider's TextReview to our Review format
+     * @param aiReview - AI review result
+     * @param analysis - Diff analysis (reserved for future use, e.g., merging AI suggestions with diff-based suggestions)
+     * @param filePath - Optional file path
+     */
+    private convertAIReview(
+        aiReview: TextReview,
+        analysis: DiffAnalysis,
+        filePath?: string
+    ): Review {
+        // Convert AI suggestions to our ReviewSuggestion format
+        const suggestions: ReviewSuggestion[] = (aiReview.suggestions || []).map((s: Suggestion) => ({
+            id: s.id || this._generateId(),
+            type: this.mapSuggestionType(s.type),
+            line: s.line || 0,
+            startLine: s.startLine || 0,
+            startColumn: s.startColumn || 0,
+            endLine: s.endLine || 0,
+            endColumn: s.endColumn || 0,
+            original: s.original || '',
+            suggested: s.suggested || '',
+            reason: s.reason || ''
+        }));
+
+        return {
+            overall: aiReview.overall || '整体质量良好',
+            strengths: aiReview.strengths || ['继续保持细致的写作态度'],
+            improvements: aiReview.improvements || ['暂无明显问题'],
+            suggestions,
+            rating: aiReview.rating || 7,
+            filePath,
+            documentVersion: undefined
+        };
+    }
+
+    /**
+     * Map AI suggestion type to our type
+     */
+    private mapSuggestionType(type: string): 'grammar' | 'style' | 'structure' | 'content' {
+        const typeMap: Record<string, 'grammar' | 'style' | 'structure' | 'content'> = {
+            'grammar': 'grammar',
+            'style': 'style',
+            'structure': 'structure',
+            'content': 'content',
+            'clarity': 'style' // Map clarity to style
+        };
+        return typeMap[type] || 'style';
+    }
+
+    /**
+     * Rule-based fallback review (original implementation)
+     */
+    private fallbackGenerateReview(analysis: DiffAnalysis, filePath?: string, fullContent?: string): Review {
         const strengths: string[] = [];
         const improvements: string[] = [];
         const suggestions: ReviewSuggestion[] = [];
-        
+
         // Analyze based on consistency report
         const { consistencyReport } = analysis;
-        
+
         // Determine strengths
         if (consistencyReport.score >= 80) {
             strengths.push('文本结构清晰，逻辑连贯');

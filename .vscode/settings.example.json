@@ -1,0 +1,6 @@
+{
+  "gitforwriter.aiProvider": "openai",
+  "gitforwriter.openai.model": "deepseek-chat",
+  "gitforwriter.openai.baseURL": "https://api.deepseek.com"
+}
+

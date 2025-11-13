@@ -98,10 +98,16 @@
           "enum": [
             "gpt-4",
             "gpt-4-turbo",
-            "gpt-3.5-turbo"
+            "gpt-3.5-turbo",
+            "deepseek-chat"
           ],
           "default": "gpt-4",
-          "description": "OpenAI model to use"
+          "description": "OpenAI model to use. For OpenAI-compatible APIs with custom baseURL, you can manually enter any model name in your workspace settings.json file (e.g., 'deepseek-chat', 'qwen-plus'). The enum provides common options for auto-completion."
+        },
+        "gitforwriter.openai.baseURL": {
+          "type": "string",
+          "default": "",
+          "description": "Custom base URL for OpenAI-compatible APIs (e.g., https://api.deepseek.com for DeepSeek)"
         },
         "gitforwriter.claude.model": {
           "type": "string",
@@ -159,6 +165,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
+    "dotenv": "^17.2.3",
     "openai": "^6.8.1",
     "simple-git": "^3.19.0",
     "uuid": "^13.0.0"

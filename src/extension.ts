@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 import { GitManager } from './utils/gitManager';
 import { StatusBarManager } from './utils/statusBarManager';
 import { AIReviewPanel } from './webview/aiReviewPanel';
@@ -11,6 +12,16 @@ import { SecretManager } from './config/secretManager';
 import { ConfigManager } from './config/configManager';
 
 export async function activate(context: vscode.ExtensionContext) {
+    // Load .env file for development/testing ONLY
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder && context.extensionMode === vscode.ExtensionMode.Development) {
+        const envPath = path.join(workspaceFolder.uri.fsPath, '.env');
+        if (fs.existsSync(envPath)) {
+            dotenv.config({ path: envPath });
+            console.warn('⚠️ Loaded .env file from workspace (development mode only)');
+        }
+    }
+
     console.log('GitForWriter is now active');
 
     const gitManager = new GitManager();
@@ -18,11 +29,10 @@ export async function activate(context: vscode.ExtensionContext) {
     const secretManager = new SecretManager(context.secrets);
     const configManager = new ConfigManager();
     const diffAnalyzer = new DiffAnalyzer(configManager, secretManager);
-    const reviewEngine = new ReviewEngine();
+    const reviewEngine = new ReviewEngine(configManager, secretManager);
     const exportManager = new ExportManager();
 
     // Initialize GitManager with workspace path
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (workspaceFolder) {
         try {
             await gitManager.initialize(workspaceFolder.uri.fsPath);

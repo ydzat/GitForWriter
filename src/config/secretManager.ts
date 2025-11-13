@@ -26,7 +26,23 @@ export class SecretManager {
      * @returns The stored OpenAI API key, or undefined if not set
      */
     async getOpenAIKey(): Promise<string | undefined> {
-        return await this.secretStorage.get(SecretManager.OPENAI_KEY);
+        // First try to get from SecretStorage
+        const storedKey = await this.secretStorage.get(SecretManager.OPENAI_KEY);
+        if (storedKey) {
+            return storedKey;
+        }
+
+        // Fallback to environment variable for development/testing ONLY.
+        // WARNING: This allows using a .env file with API_KEY variable, but environment variables
+        // in VS Code extensions are less secure than SecretStorage.
+        // Do NOT use this method in production. API keys in environment variables may be exposed
+        // to other processes or users.
+        if (process.env.API_KEY) {
+            console.warn('⚠️ Using API key from environment variable (development mode only)');
+            return process.env.API_KEY;
+        }
+
+        return undefined;
     }
 
     /**

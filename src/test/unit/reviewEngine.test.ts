@@ -4,9 +4,27 @@ import { DiffAnalysis, SemanticChange } from '../../ai/diff/diffAnalyzer';
 
 describe('ReviewEngine Unit Tests', () => {
     let reviewEngine: ReviewEngine;
+    let mockConfigManager: any;
+    let mockSecretManager: any;
 
     beforeEach(() => {
-        reviewEngine = new ReviewEngine();
+        // Create mock ConfigManager
+        mockConfigManager = {
+            getConfig: () => ({
+                provider: 'openai',
+                openai: { model: 'gpt-4' },
+                claude: { model: 'claude-3-sonnet' },
+                local: { endpoint: 'http://localhost:11434', model: 'llama2' }
+            })
+        };
+
+        // Create mock SecretManager
+        mockSecretManager = {
+            getOpenAIKey: async () => null, // No API key - will use fallback
+            getClaudeKey: async () => null
+        };
+
+        reviewEngine = new ReviewEngine(mockConfigManager, mockSecretManager);
     });
 
     function createMockAnalysis(overrides?: Partial<DiffAnalysis>): DiffAnalysis {

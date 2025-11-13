@@ -33,10 +33,12 @@ export class DiffAnalyzer {
                     return;
                 }
                 const { OpenAIProvider } = await import('../providers/openaiProvider');
-                this.aiProvider = new OpenAIProvider({
+                const providerConfig = {
                     apiKey,
-                    model: config.openai.model
-                });
+                    model: config.openai.model,
+                    ...(config.openai.baseURL && { baseURL: config.openai.baseURL })
+                };
+                this.aiProvider = new OpenAIProvider(providerConfig);
             } else if (provider === 'claude') {
                 const apiKey = await this.secretManager.getClaudeKey();
                 if (!apiKey) {

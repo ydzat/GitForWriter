@@ -7,3 +7,4 @@ coverage
 .nyc_output
 test-claude-manual.ts
 .env
+.vscode/settings.json
