@@ -96,7 +96,14 @@ export class UnifiedProvider implements AIProvider {
             if (error.statusCode === 401 || error.message?.includes('401')) {
                 throw new AIProviderError('Invalid API key', 'INVALID_API_KEY', 401, error);
             }
-            return false;
+            // Throw validation error for all other errors to maintain consistent error handling
+            console.error('Validation failed:', error);
+            throw new AIProviderError(
+                `Validation failed: ${error.message || 'Unknown error'}`,
+                'VALIDATION_ERROR',
+                error.statusCode,
+                error
+            );
         }
     }
 
@@ -164,14 +171,18 @@ export class UnifiedProvider implements AIProvider {
     }
 
     /**
-     * Validate baseURL for security (must use HTTPS)
+     * Validate baseURL for security (must use HTTPS, except for localhost)
      */
     private validateBaseURL(baseURL: string): void {
         try {
             const url = new URL(baseURL);
-            if (url.protocol !== 'https:') {
+            const isLocalhost = url.hostname === 'localhost' ||
+                                url.hostname === '127.0.0.1' ||
+                                url.hostname === '::1';
+
+            if (url.protocol !== 'https:' && !isLocalhost) {
                 throw new AIProviderError(
-                    'baseURL must use HTTPS protocol to protect API keys',
+                    'baseURL must use HTTPS protocol to protect API keys (HTTP is only allowed for localhost)',
                     'INVALID_BASE_URL'
                 );
             }
