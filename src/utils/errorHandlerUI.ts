@@ -37,7 +37,7 @@ export class ErrorHandler {
             actions = error.getSuggestedActions();
         } else {
             userMessage = `An unexpected error occurred: ${error.message}`;
-            actions = ['View error log', 'Report issue'];
+            actions = ['View Logs', 'Report Issue'];
         }
 
         // Determine severity and show appropriate notification

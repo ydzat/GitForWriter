@@ -79,10 +79,16 @@ export class ReviewEngine {
         } catch (error: any) {
             // Failed to initialize AI provider, will use fallback review
             // Log the error silently without showing UI notification
-            const { errorHandler } = await import('../../utils/errorHandlerUI');
-            errorHandler.handleSilent(error, {
-                context: 'ai_provider_initialization'
-            });
+            try {
+                const { errorHandler } = await import('../../utils/errorHandlerUI');
+                errorHandler.handleSilent(error, {
+                    context: 'ai_provider_initialization'
+                });
+            } catch (importError) {
+                // Fallback: log both errors to console to avoid masking the original error
+                console.error('Failed to import or use errorHandler:', importError);
+                console.error('Original error during AI provider initialization:', error);
+            }
             this.aiProvider = null;
         }
     }
