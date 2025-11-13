@@ -79,11 +79,10 @@ export class DiffAnalyzer {
                 };
 
                 const result = await this.aiProvider.analyzeDiff(diff, context);
-                console.log('AI analysis completed successfully');
                 return result.data;
             } catch (error) {
-                console.warn('AI analysis failed, falling back to rule-based analysis:', error);
-                // Fall through to fallback analysis
+                // Fall back to rule-based analysis on AI failure
+                // Error is logged by AI provider
             }
         }
 

@@ -103,9 +103,14 @@ describe('GitManager Unit Tests', () => {
             // Try to get diff for a file with invalid path characters
             const invalidFile = path.join(testWorkspace, 'test\x00invalid.md');
 
-            const diff = await gitManager.getDiff(invalidFile);
-            // Should return empty string on error
-            expect(diff).to.be.a('string');
+            // Should throw GitError on error
+            try {
+                await gitManager.getDiff(invalidFile);
+                expect.fail('Should have thrown GitError');
+            } catch (error: any) {
+                expect(error.name).to.equal('GitError');
+                expect(error.code).to.equal('GIT_DIFF_FAILED');
+            }
         });
     });
 

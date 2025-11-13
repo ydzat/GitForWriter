@@ -73,10 +73,22 @@ export class ReviewEngine {
                     model: config.claude.model
                 });
             } else {
-                console.warn(`Unsupported AI provider: ${provider}, will use fallback review`);
+                // Unsupported provider, will use fallback review
+                this.aiProvider = null;
             }
-        } catch (error) {
-            console.error('Failed to initialize AI provider:', error);
+        } catch (error: any) {
+            // Failed to initialize AI provider, will use fallback review
+            // Log the error silently without showing UI notification
+            try {
+                const { errorHandler } = await import('../../utils/errorHandlerUI');
+                errorHandler.handleSilent(error, {
+                    context: 'ai_provider_initialization'
+                });
+            } catch (importError) {
+                // Fallback: log both errors to console to avoid masking the original error
+                console.error('Failed to import or use errorHandler:', importError);
+                console.error('Original error during AI provider initialization:', error);
+            }
             this.aiProvider = null;
         }
     }
@@ -109,13 +121,12 @@ export class ReviewEngine {
                 };
 
                 const result = await this.aiProvider.reviewText(fullContent, context);
-                console.log('AI review completed successfully');
 
                 // Convert AI review to our Review format
                 return this.convertAIReview(result.data, analysis, filePath);
             } catch (error) {
-                console.warn('AI review failed, falling back to rule-based review:', error);
-                // Fall through to fallback review
+                // Fall back to rule-based review on AI failure
+                // Error is logged by AI provider
             }
         }
 
