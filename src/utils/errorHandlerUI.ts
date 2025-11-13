@@ -62,9 +62,13 @@ export class ErrorHandler {
         const selection = await vscode.window.showErrorMessage(message, ...actionButtons);
 
         if (selection === 'View Logs' && this.logger) {
-            const logPath = this.logger.getLogFilePath();
-            const doc = await vscode.workspace.openTextDocument(logPath);
-            await vscode.window.showTextDocument(doc);
+            try {
+                const logPath = this.logger.getLogFilePath();
+                const doc = await vscode.workspace.openTextDocument(logPath);
+                await vscode.window.showTextDocument(doc);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Failed to open log file: ${error.message}`);
+            }
         } else if (selection === 'Report Issue') {
             vscode.env.openExternal(vscode.Uri.parse('https://github.com/ydzat/GitForWriter/issues/new'));
         }
@@ -80,9 +84,13 @@ export class ErrorHandler {
         const selection = await vscode.window.showWarningMessage(message, ...actionButtons);
 
         if (selection === 'View Logs' && this.logger) {
-            const logPath = this.logger.getLogFilePath();
-            const doc = await vscode.workspace.openTextDocument(logPath);
-            await vscode.window.showTextDocument(doc);
+            try {
+                const logPath = this.logger.getLogFilePath();
+                const doc = await vscode.workspace.openTextDocument(logPath);
+                await vscode.window.showTextDocument(doc);
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Failed to open log file: ${error.message}`);
+            }
         } else if (selection === 'Report Issue') {
             vscode.env.openExternal(vscode.Uri.parse('https://github.com/ydzat/GitForWriter/issues/new'));
         }

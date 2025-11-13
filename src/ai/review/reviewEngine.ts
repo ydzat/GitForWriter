@@ -76,8 +76,13 @@ export class ReviewEngine {
                 // Unsupported provider, will use fallback review
                 this.aiProvider = null;
             }
-        } catch (error) {
+        } catch (error: any) {
             // Failed to initialize AI provider, will use fallback review
+            // Log the error silently without showing UI notification
+            const { errorHandler } = await import('../../utils/errorHandlerUI');
+            errorHandler.handleSilent(error, {
+                context: 'ai_provider_initialization'
+            });
             this.aiProvider = null;
         }
     }
