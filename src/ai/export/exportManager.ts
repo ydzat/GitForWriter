@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { ExportError } from '../../utils/errorHandler';
 
 export class ExportManager {
     async export(document: vscode.TextDocument, format: string): Promise<string> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            throw new Error('No workspace folder');
+            throw new ExportError('No workspace folder open', 'NO_WORKSPACE');
         }
 
         const outputDir = path.join(workspaceFolder.uri.fsPath, 'exports');
@@ -16,7 +17,7 @@ export class ExportManager {
 
         const fileName = path.basename(document.fileName, path.extname(document.fileName));
         const timestamp = new Date().toISOString().split('T')[0];
-        
+
         let outputPath: string;
         const content = document.getText();
 
@@ -37,7 +38,12 @@ export class ExportManager {
                 break;
 
             default:
-                throw new Error(`Unsupported format: ${format}`);
+                throw new ExportError(
+                    `Unsupported export format: ${format}`,
+                    'UNSUPPORTED_FORMAT',
+                    undefined,
+                    { format }
+                );
         }
 
         return outputPath;
@@ -110,7 +116,12 @@ To generate PDF, run one of these commands:
             }
         });
 
-        throw new Error('PDF export requires external tools. LaTeX file generated instead.');
+        throw new ExportError(
+            'PDF export requires LaTeX installation. LaTeX file generated instead.',
+            'LATEX_NOT_FOUND',
+            undefined,
+            { outputPath: texPath }
+        );
     }
 
     private convertMarkdownToLatex(markdown: string): string {

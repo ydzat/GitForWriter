@@ -10,6 +10,8 @@ import { ReviewEngine } from './ai/review/reviewEngine';
 import { ExportManager } from './ai/export/exportManager';
 import { SecretManager } from './config/secretManager';
 import { ConfigManager } from './config/configManager';
+import { errorHandler } from './utils/errorHandlerUI';
+import { GitError } from './utils/errorHandler';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Load .env file for development/testing ONLY
@@ -32,14 +34,23 @@ export async function activate(context: vscode.ExtensionContext) {
     const reviewEngine = new ReviewEngine(configManager, secretManager);
     const exportManager = new ExportManager();
 
+    // Initialize error handler
+    if (workspaceFolder) {
+        errorHandler.initialize(workspaceFolder.uri.fsPath);
+    }
+
     // Initialize GitManager with workspace path
     if (workspaceFolder) {
         try {
             await gitManager.initialize(workspaceFolder.uri.fsPath);
             console.log('GitManager initialized successfully');
-        } catch (error) {
-            console.error('Failed to initialize GitManager:', error);
-            vscode.window.showWarningMessage('GitForWriter: Failed to initialize Git. Some features may not work.');
+        } catch (error: any) {
+            const gitError = new GitError(
+                'Failed to initialize Git repository',
+                'GIT_INIT_FAILED',
+                error
+            );
+            await errorHandler.handle(gitError);
         }
     }
 
@@ -249,8 +260,8 @@ async function handleDocumentSave(
         fs.writeFileSync(analysisPath, JSON.stringify(analysis, null, 2));
 
         console.log(`Diff saved: ${diffPath}`);
-    } catch (error) {
-        console.error('Failed to handle document save:', error);
+    } catch (error: any) {
+        errorHandler.handleSilent(error, { context: 'document_save' });
     }
 }
 
