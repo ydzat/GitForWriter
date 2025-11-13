@@ -2,6 +2,7 @@ import { generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import type { LanguageModelV2 } from '@ai-sdk/provider';
 import {
     AIProvider,
     AIResponse,
@@ -32,8 +33,8 @@ export interface UnifiedProviderConfig {
  * Supports 100+ LLM providers through a unified interface
  */
 export class UnifiedProvider implements AIProvider {
-    private provider: any;
-    private model: any;
+    private provider: ReturnType<typeof createOpenAI> | ReturnType<typeof createAnthropic> | ReturnType<typeof createOpenAICompatible>;
+    private model: LanguageModelV2;
     private modelName: string;
     private maxRetries: number;
     private timeout: number;
@@ -224,9 +225,10 @@ export class UnifiedProvider implements AIProvider {
 
         for (let attempt = 0; attempt < this.maxRetries; attempt++) {
             try {
-                // Create a timeout promise
+                // Create a timeout promise with cleanup
+                let timeoutId: NodeJS.Timeout;
                 const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => {
+                    timeoutId = setTimeout(() => {
                         reject(new AIProviderError(
                             `Request timeout after ${this.timeout}ms`,
                             'TIMEOUT',
@@ -242,7 +244,7 @@ export class UnifiedProvider implements AIProvider {
                         prompt,
                         temperature: 0.3,
                         maxRetries: 0 // We handle retries ourselves
-                    }),
+                    }).finally(() => clearTimeout(timeoutId)),
                     timeoutPromise
                 ]);
 
