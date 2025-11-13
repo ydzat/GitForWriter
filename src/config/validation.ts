@@ -1,13 +1,18 @@
 /**
  * Supported AI providers
  */
-export type AIProvider = 'openai' | 'claude' | 'local';
+export type AIProvider = 'unified' | 'openai' | 'claude' | 'local';
 
 /**
  * AI configuration interface
  */
 export interface AIConfig {
     provider: AIProvider;
+    unified: {
+        provider: 'openai' | 'anthropic'; // Underlying provider for unified interface
+        model: string; // Model name (e.g., 'gpt-4', 'claude-3-opus-20240229')
+        baseURL?: string; // For OpenAI-compatible APIs
+    };
     openai: {
         model: string;
         baseURL?: string; // Support for OpenAI-compatible APIs
@@ -38,8 +43,18 @@ export function validateAIConfig(config: AIConfig): ValidationResult {
     const errors: string[] = [];
 
     // Validate provider
-    if (!['openai', 'claude', 'local'].includes(config.provider)) {
+    if (!['unified', 'openai', 'claude', 'local'].includes(config.provider)) {
         errors.push(`Invalid AI provider: ${config.provider}`);
+    }
+
+    // Validate unified provider specific settings
+    if (config.provider === 'unified') {
+        if (!config.unified.provider || !['openai', 'anthropic'].includes(config.unified.provider)) {
+            errors.push('Unified provider must specify underlying provider (openai or anthropic)');
+        }
+        if (!config.unified.model || config.unified.model.trim() === '') {
+            errors.push('Unified provider model name is required');
+        }
     }
 
     // Validate local provider specific settings

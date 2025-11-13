@@ -48,7 +48,31 @@ export class ReviewEngine {
             const config = this.configManager.getConfig();
             const provider = config.provider;
 
-            if (provider === 'openai') {
+            if (provider === 'unified') {
+                // Use unified provider (Vercel AI SDK)
+                const unifiedProvider = config.unified.provider;
+                let apiKey: string | undefined = undefined;
+
+                if (unifiedProvider === 'openai') {
+                    apiKey = await this.secretManager.getOpenAIKey();
+                } else if (unifiedProvider === 'anthropic') {
+                    apiKey = await this.secretManager.getClaudeKey();
+                }
+
+                if (!apiKey) {
+                    console.warn(`${unifiedProvider} API key not found, will use fallback review`);
+                    return;
+                }
+
+                const { UnifiedProvider } = await import('../providers/unifiedProvider');
+                const providerConfig = {
+                    provider: unifiedProvider,
+                    model: config.unified.model,
+                    apiKey,
+                    ...(config.unified.baseURL && { baseURL: config.unified.baseURL })
+                };
+                this.aiProvider = new UnifiedProvider(providerConfig);
+            } else if (provider === 'openai') {
                 const apiKey = await this.secretManager.getOpenAIKey();
                 if (!apiKey) {
                     console.warn('OpenAI API key not found, will use fallback review');

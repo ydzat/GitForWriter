@@ -7,9 +7,24 @@ import { AIConfig, validateAIConfig } from '../../config/validation';
 
 describe('ConfigManager Unit Tests', () => {
     describe('validateAIConfig()', () => {
+        it('should validate valid unified config', () => {
+            const config: AIConfig = {
+                provider: 'unified',
+                unified: { provider: 'openai', model: 'gpt-4' },
+                openai: { model: 'gpt-4' },
+                claude: { model: 'claude-3-sonnet' },
+                local: { endpoint: 'http://localhost:11434', model: 'llama2' }
+            };
+
+            const result = validateAIConfig(config);
+            expect(result.valid).to.be.true;
+            expect(result.errors).to.be.empty;
+        });
+
         it('should validate valid OpenAI config', () => {
             const config: AIConfig = {
                 provider: 'openai',
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: 'http://localhost:11434', model: 'llama2' }
@@ -23,6 +38,7 @@ describe('ConfigManager Unit Tests', () => {
         it('should validate valid Claude config', () => {
             const config: AIConfig = {
                 provider: 'claude',
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: 'http://localhost:11434', model: 'llama2' }
@@ -36,6 +52,7 @@ describe('ConfigManager Unit Tests', () => {
         it('should validate valid local config', () => {
             const config: AIConfig = {
                 provider: 'local',
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: 'http://localhost:11434', model: 'llama2' }
@@ -49,6 +66,7 @@ describe('ConfigManager Unit Tests', () => {
         it('should reject invalid provider', () => {
             const config: AIConfig = {
                 provider: 'invalid' as any,
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: 'http://localhost:11434', model: 'llama2' }
@@ -63,6 +81,7 @@ describe('ConfigManager Unit Tests', () => {
         it('should require endpoint for local provider', () => {
             const config: AIConfig = {
                 provider: 'local',
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: '', model: 'llama2' }
@@ -77,6 +96,7 @@ describe('ConfigManager Unit Tests', () => {
         it('should require model for local provider', () => {
             const config: AIConfig = {
                 provider: 'local',
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: 'http://localhost:11434', model: '' }
@@ -91,6 +111,7 @@ describe('ConfigManager Unit Tests', () => {
         it('should allow empty endpoint for non-local providers', () => {
             const config: AIConfig = {
                 provider: 'openai',
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: '', model: '' }
@@ -104,6 +125,7 @@ describe('ConfigManager Unit Tests', () => {
         it('should collect multiple validation errors', () => {
             const config: AIConfig = {
                 provider: 'local',
+                unified: { provider: 'openai', model: 'gpt-4' },
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: '', model: '' }
