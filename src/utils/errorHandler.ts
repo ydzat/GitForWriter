@@ -347,8 +347,8 @@ export async function retryWithBackoff<T>(
         } catch (error: any) {
             lastError = error;
 
-            // Don't retry on authentication errors (checked first)
-            if (error.code === 'INVALID_API_KEY' || error.statusCode === 401) {
+            // Don't retry on authentication/authorization errors (checked first)
+            if (error.code === 'INVALID_API_KEY' || error.statusCode === 401 || error.statusCode === 403) {
                 throw error;
             }
 
