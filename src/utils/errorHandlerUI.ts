@@ -74,8 +74,19 @@ export class ErrorHandler {
      * Show warning message with action buttons
      */
     private async showWarningWithActions(message: string, actions: string[]): Promise<void> {
-        const actionButtons = ['Try Again', ...actions.slice(0, 2)];
-        await vscode.window.showWarningMessage(message, ...actionButtons);
+        const defaultActions = ['View Logs', 'Report Issue'];
+        const uniqueWarningActions = actions.filter(a => !defaultActions.includes(a)).slice(0, 2);
+        const actionButtons = ['Try Again', ...defaultActions, ...uniqueWarningActions];
+        const selection = await vscode.window.showWarningMessage(message, ...actionButtons);
+
+        if (selection === 'View Logs' && this.logger) {
+            const logPath = this.logger.getLogFilePath();
+            const doc = await vscode.workspace.openTextDocument(logPath);
+            await vscode.window.showTextDocument(doc);
+        } else if (selection === 'Report Issue') {
+            vscode.env.openExternal(vscode.Uri.parse('https://github.com/ydzat/GitForWriter/issues/new'));
+        }
+        // Note: 'Try Again' button doesn't have a handler as the user can manually retry the operation
     }
 
     /**
