@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { UnifiedProvider, UnifiedProviderConfig } from '../../ai/providers/unifiedProvider';
+import { UnifiedProvider } from '../../ai/providers/unifiedProvider';
 import { AIProviderError } from '../../ai/providers/aiProvider';
 
 describe('UnifiedProvider Unit Tests', () => {

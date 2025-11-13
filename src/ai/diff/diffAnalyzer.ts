@@ -1,6 +1,7 @@
 import { AIProvider, AnalysisContext } from '../providers/aiProvider';
 import { ConfigManager } from '../../config/configManager';
 import { SecretManager } from '../../config/secretManager';
+import { initializeAIProvider } from '../providers/providerFactory';
 
 // Re-export types from aiProvider for backward compatibility
 export type { DiffAnalysis, SemanticChange, ConsistencyReport } from '../providers/aiProvider';
@@ -23,60 +24,7 @@ export class DiffAnalyzer {
      */
     private async initializeProvider(): Promise<void> {
         try {
-            const config = this.configManager.getConfig();
-            const provider = config.provider;
-
-            if (provider === 'unified') {
-                // Use unified provider (Vercel AI SDK)
-                const unifiedProvider = config.unified.provider;
-                let apiKey: string | undefined = undefined;
-
-                if (unifiedProvider === 'openai') {
-                    apiKey = await this.secretManager.getOpenAIKey();
-                } else if (unifiedProvider === 'anthropic') {
-                    apiKey = await this.secretManager.getClaudeKey();
-                }
-
-                if (!apiKey) {
-                    console.warn(`${unifiedProvider} API key not found, will use fallback analysis`);
-                    return;
-                }
-
-                const { UnifiedProvider } = await import('../providers/unifiedProvider');
-                const providerConfig = {
-                    provider: unifiedProvider,
-                    model: config.unified.model,
-                    apiKey,
-                    ...(config.unified.baseURL && { baseURL: config.unified.baseURL })
-                };
-                this.aiProvider = new UnifiedProvider(providerConfig);
-            } else if (provider === 'openai') {
-                const apiKey = await this.secretManager.getOpenAIKey();
-                if (!apiKey) {
-                    console.warn('OpenAI API key not found, will use fallback analysis');
-                    return;
-                }
-                const { OpenAIProvider } = await import('../providers/openaiProvider');
-                const providerConfig = {
-                    apiKey,
-                    model: config.openai.model,
-                    ...(config.openai.baseURL && { baseURL: config.openai.baseURL })
-                };
-                this.aiProvider = new OpenAIProvider(providerConfig);
-            } else if (provider === 'claude') {
-                const apiKey = await this.secretManager.getClaudeKey();
-                if (!apiKey) {
-                    console.warn('Claude API key not found, will use fallback analysis');
-                    return;
-                }
-                const { ClaudeProvider } = await import('../providers/claudeProvider');
-                this.aiProvider = new ClaudeProvider({
-                    apiKey,
-                    model: config.claude.model
-                });
-            } else {
-                console.warn(`Unsupported AI provider: ${provider}, will use fallback analysis`);
-            }
+            this.aiProvider = await initializeAIProvider(this.configManager, this.secretManager);
         } catch (error) {
             console.error('Failed to initialize AI provider:', error);
             this.aiProvider = null;

@@ -36,6 +36,7 @@ export class UnifiedProvider implements AIProvider {
     private model: any;
     private modelName: string;
     private maxRetries: number;
+    private timeout: number;
 
     constructor(config: UnifiedProviderConfig) {
         if (!config.apiKey || config.apiKey.trim() === '') {
@@ -44,12 +45,18 @@ export class UnifiedProvider implements AIProvider {
 
         this.modelName = config.model;
         this.maxRetries = config.maxRetries ?? 3;
+        this.timeout = config.timeout ?? 60000; // Default 60 seconds
+
+        // Validate baseURL if provided (security check)
+        if (config.baseURL) {
+            this.validateBaseURL(config.baseURL);
+        }
 
         // Initialize provider based on type
         if (config.provider === 'openai') {
             // Use OpenAI-compatible provider if baseURL is provided (for DeepSeek, etc.)
             if (config.baseURL) {
-                const fullBaseURL = config.baseURL.endsWith('/v1') ? config.baseURL : `${config.baseURL}/v1`;
+                const fullBaseURL = this.normalizeBaseURL(config.baseURL);
                 this.provider = createOpenAICompatible({
                     name: 'openai-compatible',
                     apiKey: config.apiKey,
@@ -157,6 +164,45 @@ export class UnifiedProvider implements AIProvider {
     }
 
     /**
+     * Validate baseURL for security (must use HTTPS)
+     */
+    private validateBaseURL(baseURL: string): void {
+        try {
+            const url = new URL(baseURL);
+            if (url.protocol !== 'https:') {
+                throw new AIProviderError(
+                    'baseURL must use HTTPS protocol to protect API keys',
+                    'INVALID_BASE_URL'
+                );
+            }
+        } catch (error) {
+            if (error instanceof AIProviderError) {
+                throw error;
+            }
+            throw new AIProviderError(
+                `Invalid baseURL format: ${baseURL}`,
+                'INVALID_BASE_URL',
+                undefined,
+                error as Error
+            );
+        }
+    }
+
+    /**
+     * Normalize baseURL by adding /v1 suffix if needed
+     */
+    private normalizeBaseURL(baseURL: string): string {
+        return baseURL.endsWith('/v1') ? baseURL : `${baseURL}/v1`;
+    }
+
+    /**
+     * Calculate exponential backoff delay
+     */
+    private calculateBackoffDelay(attempt: number): number {
+        return Math.pow(2, attempt) * 1000;
+    }
+
+    /**
      * Call AI with retry logic using Vercel AI SDK
      */
     private async callAI(
@@ -167,12 +213,27 @@ export class UnifiedProvider implements AIProvider {
 
         for (let attempt = 0; attempt < this.maxRetries; attempt++) {
             try {
-                const result = await generateText({
-                    model: this.model,
-                    prompt,
-                    temperature: 0.3,
-                    maxRetries: 0 // We handle retries ourselves
+                // Create a timeout promise
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => {
+                        reject(new AIProviderError(
+                            `Request timeout after ${this.timeout}ms`,
+                            'TIMEOUT',
+                            408
+                        ));
+                    }, this.timeout);
                 });
+
+                // Race between API call and timeout
+                const result = await Promise.race([
+                    generateText({
+                        model: this.model,
+                        prompt,
+                        temperature: 0.3,
+                        maxRetries: 0 // We handle retries ourselves
+                    }),
+                    timeoutPromise
+                ]);
 
                 const tokenUsage: TokenUsage = {
                     promptTokens: result.usage.inputTokens || 0,
@@ -193,7 +254,7 @@ export class UnifiedProvider implements AIProvider {
                 // Retry on rate limit errors with exponential backoff
                 if (error.statusCode === 429 || error.message?.includes('429')) {
                     if (attempt < this.maxRetries - 1) {
-                        const delay = Math.pow(2, attempt) * 1000;
+                        const delay = this.calculateBackoffDelay(attempt);
                         await new Promise(resolve => setTimeout(resolve, delay));
                         continue;
                     }
@@ -204,7 +265,7 @@ export class UnifiedProvider implements AIProvider {
 
                 // Retry on server errors (5xx) and network errors
                 if (attempt < this.maxRetries - 1) {
-                    const delay = Math.pow(2, attempt) * 1000;
+                    const delay = this.calculateBackoffDelay(attempt);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }
@@ -395,9 +456,22 @@ Respond ONLY with valid JSON.`;
             let deletions = 0;
 
             for (const line of lines) {
-                if (line.startsWith('+') && !line.startsWith('+++')) {
+                // Skip diff metadata and context lines
+                if (
+                    line.startsWith('+++') ||
+                    line.startsWith('---') ||
+                    line.startsWith('@@') ||
+                    line.startsWith('diff ') ||
+                    line.startsWith('index ') ||
+                    line.startsWith(' ') || // context lines start with a space
+                    line.trim() === ''
+                ) {
+                    continue;
+                }
+
+                if (line.startsWith('+')) {
                     additions++;
-                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                } else if (line.startsWith('-')) {
                     deletions++;
                 }
             }
