@@ -41,7 +41,7 @@ export class ErrorHandler {
         }
 
         // Determine severity and show appropriate notification
-        const severity = (error as GitForWriterError).severity || ErrorSeverity.MEDIUM;
+        const severity = error instanceof GitForWriterError ? error.severity : ErrorSeverity.MEDIUM;
 
         if (severity === ErrorSeverity.CRITICAL || severity === ErrorSeverity.HIGH) {
             await this.showErrorWithActions(userMessage, actions);
@@ -56,7 +56,9 @@ export class ErrorHandler {
      * Show error message with action buttons
      */
     private async showErrorWithActions(message: string, actions: string[]): Promise<void> {
-        const actionButtons = ['View Logs', 'Report Issue', ...actions.slice(0, 2)];
+        const defaultActions = ['View Logs', 'Report Issue'];
+        const uniqueErrorActions = actions.filter(a => !defaultActions.includes(a)).slice(0, 2);
+        const actionButtons = [...defaultActions, ...uniqueErrorActions];
         const selection = await vscode.window.showErrorMessage(message, ...actionButtons);
 
         if (selection === 'View Logs' && this.logger) {

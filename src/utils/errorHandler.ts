@@ -260,17 +260,19 @@ export class ErrorLogger {
             return;
         }
 
-        // Rotate logs
+        // Delete the oldest log file if it exists
+        const oldestFile = path.join(this.config.logDir, `error.log.${this.config.maxLogFiles}`);
+        if (fs.existsSync(oldestFile)) {
+            fs.unlinkSync(oldestFile);
+        }
+
+        // Shift log files up
         for (let i = this.config.maxLogFiles - 1; i > 0; i--) {
             const oldFile = path.join(this.config.logDir, `error.log.${i}`);
             const newFile = path.join(this.config.logDir, `error.log.${i + 1}`);
 
             if (fs.existsSync(oldFile)) {
-                if (i === this.config.maxLogFiles - 1) {
-                    fs.unlinkSync(oldFile); // Delete oldest
-                } else {
-                    fs.renameSync(oldFile, newFile);
-                }
+                fs.renameSync(oldFile, newFile);
             }
         }
 
@@ -345,18 +347,18 @@ export async function retryWithBackoff<T>(
         } catch (error: any) {
             lastError = error;
 
-            // Check if we should retry this error
-            if (shouldRetry && !shouldRetry(error)) {
-                throw error;
-            }
-
-            // Don't retry on authentication errors
+            // Don't retry on authentication errors (checked first)
             if (error.code === 'INVALID_API_KEY' || error.statusCode === 401) {
                 throw error;
             }
 
             // Don't retry on client errors (except rate limit)
             if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500 && error.statusCode !== 429) {
+                throw error;
+            }
+
+            // Check if we should retry this error (custom logic)
+            if (shouldRetry && !shouldRetry(error)) {
                 throw error;
             }
 
@@ -373,7 +375,7 @@ export async function retryWithBackoff<T>(
         }
     }
 
-    // This should never happen, but TypeScript needs it
+    // All retry attempts failed, throw NetworkError with retry information
     const errorMessage = lastError ? lastError.message : 'Unknown error';
     throw new NetworkError(
         `Failed after ${finalConfig.maxRetries} attempts: ${errorMessage}`,

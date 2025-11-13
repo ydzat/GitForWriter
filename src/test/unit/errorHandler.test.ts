@@ -10,8 +10,7 @@ import {
     NetworkError,
     ErrorSeverity,
     ErrorLogger,
-    retryWithBackoff,
-    DEFAULT_RETRY_CONFIG
+    retryWithBackoff
 } from '../../utils/errorHandler';
 
 describe('ErrorHandler', () => {

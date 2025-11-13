@@ -261,7 +261,12 @@ async function handleDocumentSave(
 
         console.log(`Diff saved: ${diffPath}`);
     } catch (error: any) {
-        errorHandler.handleSilent(error, { context: 'document_save' });
+        // Only use errorHandler if it's initialized (workspace folder exists)
+        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+            errorHandler.handleSilent(error, { context: 'document_save' });
+        } else {
+            console.error('Error during document save:', error);
+        }
     }
 }
 
