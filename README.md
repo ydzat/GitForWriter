@@ -213,7 +213,56 @@ your-writing-project/
 
 ## 🔧 配置选项
 
-在 VSCode 设置中搜索 "GitForWriter"：
+### AI Provider 配置
+
+GitForWriter 支持多种 AI 提供商，通过 Vercel AI SDK 提供统一接口访问 100+ LLM 模型。
+
+#### 推荐：使用 Unified Provider（默认）
+
+Unified Provider 通过 Vercel AI SDK 提供对多个 LLM 提供商的统一访问：
+
+```json
+{
+  "gitforwriter.aiProvider": "unified",
+  "gitforwriter.unified.provider": "openai",  // 或 "anthropic"
+  "gitforwriter.unified.model": "gpt-4",      // 或 "claude-3-opus-20240229"
+  "gitforwriter.unified.baseURL": ""          // 可选：OpenAI 兼容 API 的自定义 URL
+}
+```
+
+**支持的模型示例：**
+- **OpenAI**: `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo`
+- **Anthropic**: `claude-3-opus-20240229`, `claude-3-sonnet-20240229`, `claude-3-haiku-20240307`
+- **OpenAI 兼容 API**: DeepSeek, Qwen, 等（通过 `baseURL` 配置）
+
+**配置 API Key：**
+1. 打开命令面板 (`Ctrl+Shift+P` 或 `Cmd+Shift+P`)
+2. 根据选择的 provider 运行相应命令：
+   - OpenAI: "GitForWriter: Set OpenAI API Key"
+   - Anthropic: "GitForWriter: Set Claude API Key"
+
+#### 传统 Provider（向后兼容）
+
+仍然支持直接使用 OpenAI 或 Claude provider：
+
+**OpenAI Provider:**
+```json
+{
+  "gitforwriter.aiProvider": "openai",
+  "gitforwriter.openai.model": "gpt-4",
+  "gitforwriter.openai.baseURL": ""  // 可选：用于 DeepSeek 等兼容 API
+}
+```
+
+**Claude Provider:**
+```json
+{
+  "gitforwriter.aiProvider": "claude",
+  "gitforwriter.claude.model": "claude-3-sonnet"
+}
+```
+
+### 其他配置选项
 
 ```json
 {
@@ -287,7 +336,8 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 ## 🔮 未来规划
 
 - [ ] 支持更多语言（目前主要针对中文和英文）
-- [ ] 集成更强大的 AI 模型（GPT-4, Claude 等）
+- [x] ~~集成更强大的 AI 模型（GPT-4, Claude 等）~~ ✅ 已完成（v1.0.0）
+- [x] ~~统一 LLM 接口支持 100+ 模型~~ ✅ 已完成（v1.0.0 - Vercel AI SDK）
 - [ ] 协作功能（多人写作、评论、讨论）
 - [ ] 写作统计和分析（字数、进度、习惯分析）
 - [ ] 自定义审校规则
