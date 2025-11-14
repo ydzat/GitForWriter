@@ -83,7 +83,14 @@ function sanitizeLatex(latexStr: string): string {
    - Item 1
      - Subitem 1.1
    ```
-   will be treated as flat lists. Nested list support may be added in future versions.
+   will be treated as flat lists. For example, the above Markdown will be converted to LaTeX as:
+   ```latex
+   \begin{itemize}
+     \item Item 1
+     \item Subitem 1.1
+   \end{itemize}
+   ```
+   Nested list support may be added in future versions.
 
 3. **Nested Structures**: Complex nested structures (e.g., lists within blockquotes, tables within lists) may not be fully supported.
 

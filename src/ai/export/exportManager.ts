@@ -348,7 +348,8 @@ ${content}
         // Step 5: Convert images
         // ![alt](url "caption") or ![alt](url)
         latex = latex.replace(/!\[([^\]]*)\]\(([^)"]+)(?:\s+"([^"]+)")?\)/g, (_, alt, url, caption) => {
-            const label = alt.toLowerCase().replace(/\s+/g, '-');
+            // Clean label: remove non-alphanumeric chars (except hyphens/underscores), collapse multiple hyphens
+            const label = alt.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-');
             // Escape caption for LaTeX special characters
             const escapedCaption = caption ? this.escapeLatex(caption) : '';
             if (caption) {
@@ -359,8 +360,9 @@ ${content}
         });
 
         // Step 6: Convert citations [@ref] or [@ref1; @ref2]
+        // Flexible handling of whitespace around semicolons
         latex = latex.replace(/\[@([^\]]+)\]/g, (_, refs) => {
-            const refList = refs.split(';').map((r: string) => r.trim().replace('@', ''));
+            const refList = refs.split(/\s*;\s*/).map((r: string) => r.trim().replace(/^@/, ''));
             return `\\cite{${refList.join(',')}}`;
         });
 
@@ -374,8 +376,8 @@ ${content}
         latex = this.convertBlockquotes(latex);
 
         // Step 9: Convert horizontal rules (before bold/italic to avoid *** being treated as formatting)
-        latex = latex.replace(/^---$/gm, '\\hrule');
-        latex = latex.replace(/^\*\*\*$/gm, '\\hrule');
+        // Supports ---, ***, and ___ (3 or more characters)
+        latex = latex.replace(/^\s*[-*_]{3,}\s*$/gm, '\\hrule');
 
         // Step 10: Convert bold and italic (with escaping, avoid conflicts with math)
         latex = latex.replace(/\*\*(.+?)\*\*/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
@@ -544,11 +546,11 @@ ${content}
                 // Start of blockquote
                 result.push('\\begin{quote}');
                 inQuote = true;
-                // Convert the quote line (remove '>' and add content)
-                result.push(trimmedLine.substring(1).trim());
+                // Convert the quote line (remove '>' and escape content)
+                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
             } else if (isQuoteLine && inQuote) {
-                // Continuation of blockquote
-                result.push(trimmedLine.substring(1).trim());
+                // Continuation of blockquote (escape content)
+                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
             } else if (!isQuoteLine && inQuote && trimmedLine !== '') {
                 // End of blockquote (non-empty, non-quote line)
                 result.push('\\end{quote}');
@@ -600,11 +602,13 @@ ${content}
                 result.push(`\\begin{${listType}}`);
                 inList = true;
 
-                // Convert the list item (use trimmedLine for consistent matching)
+                // Convert the list item (use trimmedLine for consistent matching, escape content)
                 if (isUnorderedItem) {
-                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 } else {
-                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
+                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 }
             } else if (isListItem && inList) {
                 // Check if list type is changing
@@ -615,11 +619,13 @@ ${content}
                     result.push(`\\begin{${listType}}`);
                 }
 
-                // Convert the list item (use trimmedLine for consistent matching)
+                // Convert the list item (use trimmedLine for consistent matching, escape content)
                 if (isUnorderedItem) {
-                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 } else {
-                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
+                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 }
             } else if (!isListItem && !isEmptyLine && inList) {
                 // Ending the list
