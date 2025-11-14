@@ -25,6 +25,7 @@ export type TemplateType = 'default' | 'academic' | 'book' | 'article';
 export class ExportManager {
     private availableCompilers: LaTeXCompiler[] = [];
     private compilersDetected: boolean = false;
+    private detectionPromise: Promise<void> | null = null;
 
     constructor() {
         // Compiler detection will be done lazily on first use
@@ -312,46 +313,57 @@ ${content}
     /**
      * Detect available LaTeX compilers in system PATH
      * Only runs once, subsequent calls return immediately
+     * Uses Promise-based approach to prevent race conditions
      */
     private async detectLaTeXCompilers(): Promise<void> {
+        // If detection is already in progress, wait for it to complete
+        if (this.detectionPromise) {
+            return this.detectionPromise;
+        }
+
         // Skip if already detected
         if (this.compilersDetected) {
             return;
         }
 
-        const compilers = [
-            { name: 'pdflatex', command: 'pdflatex' },
-            { name: 'xelatex', command: 'xelatex' },
-            { name: 'lualatex', command: 'lualatex' }
-        ];
+        // Start detection and store the promise
+        this.detectionPromise = (async () => {
+            const compilers = [
+                { name: 'pdflatex', command: 'pdflatex' },
+                { name: 'xelatex', command: 'xelatex' },
+                { name: 'lualatex', command: 'lualatex' }
+            ];
 
-        this.availableCompilers = [];
+            this.availableCompilers = [];
 
-        for (const compiler of compilers) {
-            try {
-                // Check if compiler is available by running --version
-                const { stdout } = await execFileAsync(compiler.command, ['--version']);
-                // Verify that stdout contains expected version information
-                if (
-                    stdout &&
-                    (
-                        (compiler.name === 'pdflatex' && /pdfTeX|pdflatex/i.test(stdout)) ||
-                        (compiler.name === 'xelatex' && /XeTeX|xelatex/i.test(stdout)) ||
-                        (compiler.name === 'lualatex' && /LuaTeX|lualatex/i.test(stdout))
-                    )
-                ) {
-                    this.availableCompilers.push({
-                        name: compiler.name,
-                        command: compiler.command,
-                        available: true
-                    });
+            for (const compiler of compilers) {
+                try {
+                    // Check if compiler is available by running --version
+                    const { stdout } = await execFileAsync(compiler.command, ['--version']);
+                    // Verify that stdout contains expected version information
+                    if (
+                        stdout &&
+                        (
+                            (compiler.name === 'pdflatex' && /pdfTeX|pdflatex/i.test(stdout)) ||
+                            (compiler.name === 'xelatex' && /XeTeX|xelatex/i.test(stdout)) ||
+                            (compiler.name === 'lualatex' && /LuaTeX|lualatex/i.test(stdout))
+                        )
+                    ) {
+                        this.availableCompilers.push({
+                            name: compiler.name,
+                            command: compiler.command,
+                            available: true
+                        });
+                    }
+                } catch (error) {
+                    // Compiler not found, skip
                 }
-            } catch (error) {
-                // Compiler not found, skip
             }
-        }
 
-        this.compilersDetected = true;
+            this.compilersDetected = true;
+        })();
+
+        return this.detectionPromise;
     }
 
     /**

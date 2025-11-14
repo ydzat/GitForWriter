@@ -188,19 +188,7 @@ tlmgr install <package-name>
 
 ### Custom Templates
 
-You can create custom templates in `src/ai/export/templates/`. **Note:** Custom templates are intended for development or forking purposes only. To make your custom template available in the extension, follow these steps:
-
-1. Create a new `.tex` file in `src/ai/export/templates/` (e.g., `custom.tex`).
-2. Use placeholders in your template:
-   - `{{TITLE}}` - Document title (automatically escaped for LaTeX)
-   - `{{AUTHOR}}` - Author name (automatically escaped for LaTeX)
-   - `{{DATE}}` - Current date (automatically escaped for LaTeX)
-   - `{{CONTENT}}` - Main content
-3. Add your template name (without `.tex`, e.g., `custom`) to the `gitforwriter.latex.template` enum in `package.json`.
-4. Run `npm run copy-templates` to copy your template to the output directory.
-5. Recompile the extension with `npm run compile`.
-
-Your custom template will now be available as a configuration option. If you skip any of these steps, the template will not be included in the packaged extension.
+**Note:** Custom templates are intended for development or forking purposes only. If you wish to create or modify templates, please fork the extension and refer to the developer documentation for guidance. Template customization is not officially supported in the standard extension.
 
 ### Manual Compilation
 
