@@ -172,6 +172,8 @@ ${content}
         }
 
         // Fallback to default template
+        // Note: 'default' template is hardcoded above, so this recursion is safe
+        // and will always terminate after one level
         return this.applyTemplate(content, outputPath, 'default');
     }
 
@@ -457,6 +459,14 @@ ${content}
     ): Promise<void> {
         if (token?.isCancellationRequested) {
             throw new ExportError('Compilation cancelled', 'COMPILATION_CANCELLED');
+        }
+
+        // Validate filename to prevent potential issues with special characters
+        if (!texFileName.endsWith('.tex') || texFileName.includes('..') || /[<>:"|?*]/.test(texFileName)) {
+            throw new ExportError(
+                'Invalid filename for LaTeX compilation',
+                'INVALID_FILENAME'
+            );
         }
 
         try {

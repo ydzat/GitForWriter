@@ -243,6 +243,7 @@ Test content
             // Academic template should have specific packages
             assert.ok(content.includes('\\usepackage{amsmath,amssymb,amsthm}'), 'Should include amsmath, amssymb, and amsthm packages');
             assert.ok(content.includes('\\usepackage{cite}'), 'Should include cite package');
+            assert.ok(content.includes('\\usepackage{graphicx}'), 'Should include graphicx package');
             // Note: abstract is now commented out by default
         } finally {
             // Always reset, even if test fails
