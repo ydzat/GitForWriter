@@ -501,6 +501,9 @@ ${content}
      * Convert blockquotes to LaTeX quote environment
      * This method tracks blockquote state during conversion to avoid the issue
      * of checking for '>' after it's already been replaced
+     *
+     * Note: Uses standard LaTeX quote environment without itemize, treating
+     * blockquote lines as regular paragraph text (semantically correct)
      */
     private convertBlockquotes(markdown: string): string {
         const lines = markdown.split('\n');
@@ -515,22 +518,20 @@ ${content}
             if (isQuoteLine && !inQuote) {
                 // Start of blockquote
                 result.push('\\begin{quote}');
-                result.push('\\begin{itemize}');
                 inQuote = true;
-                // Convert the quote line
-                result.push('\\item ' + trimmedLine.substring(1).trim());
+                // Convert the quote line (remove '>' and add content)
+                result.push(trimmedLine.substring(1).trim());
             } else if (isQuoteLine && inQuote) {
                 // Continuation of blockquote
-                result.push('\\item ' + trimmedLine.substring(1).trim());
+                result.push(trimmedLine.substring(1).trim());
             } else if (!isQuoteLine && inQuote && trimmedLine !== '') {
                 // End of blockquote (non-empty, non-quote line)
-                result.push('\\end{itemize}');
                 result.push('\\end{quote}');
                 inQuote = false;
                 result.push(line);
             } else if (trimmedLine === '' && inQuote) {
-                // Empty line within blockquote - keep it but don't end the quote
-                result.push(line);
+                // Empty line within blockquote - preserve for paragraph break
+                result.push('');
             } else {
                 // Regular line
                 result.push(line);
@@ -539,7 +540,6 @@ ${content}
 
         // Close any unclosed blockquote
         if (inQuote) {
-            result.push('\\end{itemize}');
             result.push('\\end{quote}');
         }
 
