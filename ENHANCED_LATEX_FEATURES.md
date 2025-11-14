@@ -16,6 +16,34 @@ The enhanced LaTeX conversion now supports advanced Markdown features including:
 - Horizontal rules
 - Ordered and unordered lists
 
+## ⚠️ Security Warning
+
+**Raw LaTeX Passthrough**: This feature allows arbitrary LaTeX commands to be preserved and executed during compilation. If you process untrusted Markdown content, this poses a security risk:
+
+- Malicious users could inject LaTeX commands that write to the filesystem
+- Commands like `\input` could include sensitive files
+- Shell commands could be executed if shell-escape is enabled
+
+**Recommendations**:
+- Only process trusted Markdown content
+- Disable shell-escape in LaTeX compilation for untrusted content
+- Consider adding a configuration option to disable raw LaTeX passthrough when processing user-submitted content
+- Be especially cautious in web applications or shared editing environments
+
+## Known Limitations
+
+1. **Special Character Escaping**: All user content (headings, table cells, footnotes, etc.) is automatically escaped for LaTeX special characters. However, content within math equations and raw LaTeX blocks is preserved as-is.
+
+2. **Nested Structures**: Complex nested structures (e.g., lists within blockquotes, tables within lists) may not be fully supported.
+
+3. **Image Width**: Image width is currently hardcoded to `0.8\textwidth`. This may be made configurable in future versions.
+
+4. **Code Block Formatting**: Code blocks require a newline after the opening fence and before the closing fence. Inline-style code blocks without newlines are not supported.
+
+5. **Bold/Italic in Headings**: Formatting markers within headings are processed, but complex nested formatting may not work as expected.
+
+6. **Citation Format**: Only supports basic `[@ref]` and `[@ref1; @ref2]` citation formats. Advanced citation features may require manual LaTeX editing.
+
 ## Feature Details
 
 ### 1. Tables

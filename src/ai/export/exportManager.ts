@@ -293,7 +293,7 @@ ${content}
         // Collect footnote definitions
         const footnotes: Map<string, string> = new Map();
         latex = latex.replace(/^\[\^(\w+)\]:\s*(.+)$/gm, (_, id, text) => {
-            footnotes.set(id, text);
+            footnotes.set(id, this.escapeLatex(text));
             return '';  // Remove definition from main text
         });
 
@@ -310,8 +310,10 @@ ${content}
         // ![alt](url "caption") or ![alt](url)
         latex = latex.replace(/!\[([^\]]*)\]\(([^)"]+)(?:\s+"([^"]+)")?\)/g, (_, alt, url, caption) => {
             const label = alt.toLowerCase().replace(/\s+/g, '-');
+            // Escape caption for LaTeX special characters
+            const escapedCaption = caption ? this.escapeLatex(caption) : '';
             if (caption) {
-                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${url}}\n\\caption{${caption}}\n\\label{fig:${label}}\n\\end{figure}`;
+                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${url}}\n\\caption{${escapedCaption}}\n\\label{fig:${label}}\n\\end{figure}`;
             } else {
                 return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${url}}\n\\end{figure}`;
             }
@@ -323,30 +325,29 @@ ${content}
             return `\\cite{${refList.join(',')}}`;
         });
 
-        // Step 7: Convert headings
-        latex = latex.replace(/^# (.+)$/gm, '\\section{$1}');
-        latex = latex.replace(/^## (.+)$/gm, '\\subsection{$1}');
-        latex = latex.replace(/^### (.+)$/gm, '\\subsubsection{$1}');
-        latex = latex.replace(/^#### (.+)$/gm, '\\paragraph{$1}');
+        // Step 7: Convert headings (with special character escaping)
+        latex = latex.replace(/^# (.+)$/gm, (_, heading) => `\\section{${this.escapeLatex(heading)}}`);
+        latex = latex.replace(/^## (.+)$/gm, (_, heading) => `\\subsection{${this.escapeLatex(heading)}}`);
+        latex = latex.replace(/^### (.+)$/gm, (_, heading) => `\\subsubsection{${this.escapeLatex(heading)}}`);
+        latex = latex.replace(/^#### (.+)$/gm, (_, heading) => `\\paragraph{${this.escapeLatex(heading)}}`);
 
-        // Step 8: Convert blockquotes
-        latex = latex.replace(/^> (.+)$/gm, '\\item $1');
-        latex = this.wrapBlockquotes(latex);
+        // Step 8: Convert blockquotes (use placeholder to track state)
+        latex = this.convertBlockquotes(latex);
 
-        // Step 9: Convert bold and italic (avoid conflicts with math)
-        latex = latex.replace(/\*\*(.+?)\*\*/g, '\\textbf{$1}');
-        latex = latex.replace(/\*(.+?)\*/g, '\\textit{$1}');
-        latex = latex.replace(/__(.+?)__/g, '\\textbf{$1}');
-        latex = latex.replace(/_(.+?)_/g, '\\textit{$1}');
+        // Step 9: Convert bold and italic (with escaping, avoid conflicts with math)
+        latex = latex.replace(/\*\*(.+?)\*\*/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
+        latex = latex.replace(/\*(.+?)\*/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
+        latex = latex.replace(/__(.+?)__/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
+        latex = latex.replace(/_(.+?)_/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
 
         // Step 10: Convert code blocks with syntax highlighting
         latex = this.convertCodeBlocks(latex);
 
-        // Step 11: Convert inline code
-        latex = latex.replace(/`(.+?)`/g, '\\texttt{$1}');
+        // Step 11: Convert inline code (escape special chars in code)
+        latex = latex.replace(/`(.+?)`/g, (_, code) => `\\texttt{${this.escapeLatex(code)}}`);
 
-        // Step 12: Convert links
-        latex = latex.replace(/\[(.+?)\]\((.+?)\)/g, '\\href{$2}{$1}');
+        // Step 12: Convert links (escape link text)
+        latex = latex.replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => `\\href{${url}}{${this.escapeLatex(text)}}`);
 
         // Step 13: Convert horizontal rules
         latex = latex.replace(/^---$/gm, '\\hrule');
@@ -379,8 +380,8 @@ ${content}
                 const headerLine = line;
                 const separatorLine = lines[i + 1];
 
-                // Verify it's a table by checking separator line
-                if (separatorLine.match(/^\|?[\s:-]+\|/)) {
+                // Verify it's a table by checking separator line (strict validation)
+                if (separatorLine.match(/^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/)) {
                     // Parse table
                     const tableLines: string[] = [headerLine];
                     let j = i + 2;
@@ -411,8 +412,8 @@ ${content}
      * Convert a single Markdown table to LaTeX tabular
      */
     private convertTableToLatex(tableLines: string[], separatorLine: string): string {
-        // Parse header
-        const header = tableLines[0].split('|').map(cell => cell.trim()).filter(cell => cell);
+        // Parse header (with escaping)
+        const header = tableLines[0].split('|').map(cell => this.escapeLatex(cell.trim())).filter(cell => cell);
 
         // Parse alignment from separator line
         const alignments = separatorLine.split('|').map(cell => cell.trim()).filter(cell => cell).map(sep => {
@@ -421,9 +422,9 @@ ${content}
             return 'l';
         });
 
-        // Parse data rows
+        // Parse data rows (with escaping)
         const dataRows = tableLines.slice(1).map(line =>
-            line.split('|').map(cell => cell.trim()).filter(cell => cell)
+            line.split('|').map(cell => this.escapeLatex(cell.trim())).filter(cell => cell)
         );
 
         // Build LaTeX table
@@ -447,7 +448,8 @@ ${content}
      * Convert code blocks with language-specific syntax highlighting
      */
     private convertCodeBlocks(markdown: string): string {
-        return markdown.replace(/```(\w+)?\n([\s\S]+?)```/g, (_, lang, code) => {
+        // More flexible pattern to handle optional whitespace and newlines
+        return markdown.replace(/```(\w+)?\s*\n([\s\S]+?)\n```/g, (_, lang, code) => {
             if (lang) {
                 // Use listings package for syntax highlighting
                 return `\\begin{lstlisting}[language=${this.mapLanguage(lang)}]\n${code}\\end{lstlisting}`;
@@ -494,9 +496,11 @@ ${content}
     }
 
     /**
-     * Wrap blockquote items in quote environment
+     * Convert blockquotes to LaTeX quote environment
+     * This method tracks blockquote state during conversion to avoid the issue
+     * of checking for '>' after it's already been replaced
      */
-    private wrapBlockquotes(markdown: string): string {
+    private convertBlockquotes(markdown: string): string {
         const lines = markdown.split('\n');
         const result: string[] = [];
         let inQuote = false;
@@ -504,24 +508,34 @@ ${content}
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmedLine = line.trim();
-            const isQuoteItem = trimmedLine.startsWith('\\item') && i > 0 && lines[i - 1].includes('>');
-            const isEmptyLine = trimmedLine === '';
+            const isQuoteLine = trimmedLine.startsWith('>');
 
-            if (isQuoteItem && !inQuote) {
+            if (isQuoteLine && !inQuote) {
+                // Start of blockquote
                 result.push('\\begin{quote}');
                 result.push('\\begin{itemize}');
                 inQuote = true;
-                result.push(line);
-            } else if (!isQuoteItem && !isEmptyLine && inQuote) {
+                // Convert the quote line
+                result.push('\\item ' + trimmedLine.substring(1).trim());
+            } else if (isQuoteLine && inQuote) {
+                // Continuation of blockquote
+                result.push('\\item ' + trimmedLine.substring(1).trim());
+            } else if (!isQuoteLine && inQuote && trimmedLine !== '') {
+                // End of blockquote (non-empty, non-quote line)
                 result.push('\\end{itemize}');
                 result.push('\\end{quote}');
                 inQuote = false;
                 result.push(line);
+            } else if (trimmedLine === '' && inQuote) {
+                // Empty line within blockquote - keep it but don't end the quote
+                result.push(line);
             } else {
+                // Regular line
                 result.push(line);
             }
         }
 
+        // Close any unclosed blockquote
         if (inQuote) {
             result.push('\\end{itemize}');
             result.push('\\end{quote}');

@@ -528,5 +528,110 @@ This has a note[^1].
             assert.ok(latexContent.includes('\\footnote'), 'Should have footnotes');
         });
     });
+
+    suite('Special Character Escaping', () => {
+        test('should escape special characters in headings', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-heading.md');
+            const content = '# Cost & Analysis: $100 #1';
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('Cost \\& Analysis: \\$100 \\#1'), 'Should escape special chars in heading');
+        });
+
+        test('should escape special characters in table cells', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-table.md');
+            const content = `| Name | Cost |
+|------|------|
+| Item #1 | $50 & tax |`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('Item \\#1'), 'Should escape # in table');
+            assert.ok(latexContent.includes('\\$50 \\& tax'), 'Should escape $ and & in table');
+        });
+
+        test('should escape special characters in footnotes', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-footnote.md');
+            const content = `Text with footnote[^1]
+
+[^1]: Cost is $100 & includes 20% tax`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\footnote{Cost is \\$100 \\& includes 20\\% tax}'), 'Should escape special chars in footnote');
+        });
+
+        test('should escape special characters in image captions', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-image.md');
+            const content = '![Graph](image.png "Cost & Revenue: $1000")';
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\caption{Cost \\& Revenue: \\$1000}'), 'Should escape special chars in caption');
+        });
+
+        test('should escape special characters in bold and italic text', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-format.md');
+            const content = '**Cost: $100** and *20% discount*';
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\textbf{Cost: \\$100}'), 'Should escape special chars in bold');
+            assert.ok(latexContent.includes('\\textit{20\\% discount}'), 'Should escape special chars in italic');
+        });
+
+        test('should escape special characters in inline code', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-code.md');
+            const content = 'Use `$variable` and `100%` in code';
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\texttt{\\$variable}'), 'Should escape $ in code');
+            assert.ok(latexContent.includes('\\texttt{100\\%}'), 'Should escape % in code');
+        });
+
+        test('should escape special characters in link text', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-link.md');
+            const content = '[Cost & Analysis](http://example.com)';
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\href{http://example.com}{Cost \\& Analysis}'), 'Should escape special chars in link text');
+        });
+
+        test('should handle backslash escaping correctly', async () => {
+            const testFilePath = path.join(testWorkspace, 'special-backslash.md');
+            const content = '# Path: C:\\\\Users\\\\Documents';
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\textbackslash{}'), 'Should escape backslashes');
+        });
+    });
 });
 
