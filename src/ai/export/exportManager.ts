@@ -167,6 +167,19 @@ generator: GitForWriter
     }
 
     /**
+     * Escape special LaTeX characters in URLs
+     * Only escapes characters that break LaTeX, preserves URL structure
+     * Does not escape : / ? = . which are part of URL syntax
+     */
+    private escapeUrl(url: string): string {
+        return url
+            .replace(/#/g, '\\#')
+            .replace(/%/g, '\\%')
+            .replace(/&/g, '\\&')
+            .replace(/_/g, '\\_');
+    }
+
+    /**
      * Apply a LaTeX template to content
      */
     private applyTemplate(content: string, outputPath: string, templateType: TemplateType): string {
@@ -352,12 +365,13 @@ ${content}
         latex = latex.replace(/!\[([^\]]*)\]\(([^)"]+)(?:\s+"([^"]+)")?\)/g, (_, alt, url, caption) => {
             // Clean label: remove non-alphanumeric chars (except hyphens/underscores), collapse multiple hyphens
             const label = alt.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-');
-            // Escape caption for LaTeX special characters
+            // Escape caption and URL for LaTeX special characters
             const escapedCaption = caption ? this.escapeLatex(caption) : '';
+            const escapedUrl = this.escapeUrl(url);
             if (caption) {
-                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${url}}\n\\caption{${escapedCaption}}\n\\label{fig:${label}}\n\\end{figure}`;
+                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${escapedUrl}}\n\\caption{${escapedCaption}}\n\\label{fig:${label}}\n\\end{figure}`;
             } else {
-                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${url}}\n\\end{figure}`;
+                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${escapedUrl}}\n\\end{figure}`;
             }
         });
 
@@ -378,8 +392,8 @@ ${content}
         latex = this.convertBlockquotes(latex);
 
         // Step 9: Convert horizontal rules (before bold/italic to avoid *** being treated as formatting)
-        // Supports ---, ***, and ___ (3 or more characters)
-        latex = latex.replace(/^\s*[-*_]{3,}\s*$/gm, '\\hrule');
+        // Supports ---, ***, ___, and variants with spaces (e.g., * * *, - - -)
+        latex = latex.replace(/^\s*(?:[-*_]\s*){3,}$/gm, '\\hrule');
 
         // Step 10: Convert bold and italic (with escaping, avoid conflicts with math)
         latex = latex.replace(/\*\*(.+?)\*\*/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
@@ -393,8 +407,8 @@ ${content}
         // Step 12: Convert inline code (escape special chars in code)
         latex = latex.replace(/`(.+?)`/g, (_, code) => `\\texttt{${this.escapeLatex(code)}}`);
 
-        // Step 13: Convert links (escape link text, avoid nested brackets)
-        latex = latex.replace(/\[([^\[\]]+)\]\(([^)]+)\)/g, (_, text, url) => `\\href{${url}}{${this.escapeLatex(text)}}`);
+        // Step 13: Convert links (escape link text and URL, avoid nested brackets)
+        latex = latex.replace(/\[([^\[\]]+)\]\(([^)]+)\)/g, (_, text, url) => `\\href{${this.escapeUrl(url)}}{${this.escapeLatex(text)}}`);
 
 
         // Step 14: Convert lists (both unordered and ordered)
@@ -442,9 +456,13 @@ ${content}
                     const tableLines: string[] = [headerLine];
                     let j = i + 2;
 
-                    // Collect all table rows
+                    // Collect all table rows, validate column count
                     while (j < lines.length && lines[j].includes('|')) {
-                        tableLines.push(lines[j]);
+                        const rowCols = lines[j].split('|').slice(1, -1);
+                        // Only include rows with correct column count
+                        if (rowCols.length === headerCols.length) {
+                            tableLines.push(lines[j]);
+                        }
                         j++;
                     }
 
@@ -593,9 +611,9 @@ ${content}
             const line = lines[i];
             const trimmedLine = line.trim();
 
-            // Check if this is a list item
-            const isUnorderedItem = /^[\*\-]\s+(.+)$/.test(trimmedLine);
-            const isOrderedItem = /^\d+\.\s+(.+)$/.test(trimmedLine);
+            // Check if this is a list item (supports empty list items)
+            const isUnorderedItem = /^[\*\-]\s+(.*)$/.test(trimmedLine);
+            const isOrderedItem = /^\d+\.\s+(.*)$/.test(trimmedLine);
             const isListItem = isUnorderedItem || isOrderedItem;
             const isEmptyLine = trimmedLine === '';
 
@@ -613,10 +631,10 @@ ${content}
                 // However, those steps only escape content within their own constructs
                 // We still need to escape special chars in the remaining text
                 if (isUnorderedItem) {
-                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.*)$/, '$2');
                     result.push(`\\item ${this.escapeLatex(content)}`);
                 } else {
-                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
+                    const content = trimmedLine.replace(/^\d+\.\s+(.*)$/, '$1');
                     result.push(`\\item ${this.escapeLatex(content)}`);
                 }
             } else if (isListItem && inList) {
@@ -630,10 +648,10 @@ ${content}
 
                 // Convert the list item (escape remaining special chars)
                 if (isUnorderedItem) {
-                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.*)$/, '$2');
                     result.push(`\\item ${this.escapeLatex(content)}`);
                 } else {
-                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
+                    const content = trimmedLine.replace(/^\d+\.\s+(.*)$/, '$1');
                     result.push(`\\item ${this.escapeLatex(content)}`);
                 }
             } else if (!isListItem && !isEmptyLine && inList) {
