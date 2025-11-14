@@ -18,7 +18,12 @@ export class ConfigManager {
         const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_SECTION);
 
         return {
-            provider: config.get<AIProvider>('aiProvider', 'openai'),
+            provider: config.get<AIProvider>('aiProvider', 'openai'), // Default to 'openai' for backward compatibility
+            unified: {
+                provider: config.get<'openai' | 'anthropic'>('unified.provider', 'openai'),
+                model: config.get<string>('unified.model', 'gpt-4'),
+                baseURL: config.get<string>('unified.baseURL')
+            },
             openai: {
                 model: config.get<string>('openai.model', 'gpt-4'),
                 baseURL: config.get<string>('openai.baseURL')
