@@ -30,9 +30,14 @@ const texFiles = files.filter(f => f.endsWith('.tex'));
 texFiles.forEach(file => {
     const srcPath = path.join(srcTemplatesDir, file);
     const destPath = path.join(outTemplatesDir, file);
-    
-    fs.copyFileSync(srcPath, destPath);
-    console.log(`Copied: ${file}`);
+
+    try {
+        fs.copyFileSync(srcPath, destPath);
+        console.log(`Copied: ${file}`);
+    } catch (error) {
+        console.error(`Failed to copy ${file}:`, error.message);
+        process.exit(1);
+    }
 });
 
 console.log(`✅ Copied ${texFiles.length} template file(s) to output directory`);

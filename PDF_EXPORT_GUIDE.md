@@ -194,7 +194,7 @@ You can create custom templates in `src/ai/export/templates/`. **Note:** Custom 
 2. Use placeholders in your template:
    - `{{TITLE}}` - Document title (automatically escaped for LaTeX)
    - `{{AUTHOR}}` - Author name (automatically escaped for LaTeX)
-   - `{{DATE}}` - Current date
+   - `{{DATE}}` - Current date (automatically escaped for LaTeX)
    - `{{CONTENT}}` - Main content
 3. Add your template name (without `.tex`, e.g., `custom`) to the `gitforwriter.latex.template` enum in `package.json`.
 4. Run `npm run copy-templates` to copy your template to the output directory.

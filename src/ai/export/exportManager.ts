@@ -132,7 +132,8 @@ generator: GitForWriter
     private applyTemplate(content: string, outputPath: string, templateType: TemplateType): string {
         const rawTitle = path.basename(outputPath, '.tex').replace(/_/g, ' ');
         const title = this.escapeLatex(rawTitle);
-        const date = new Date().toLocaleDateString();
+        const rawDate = new Date().toLocaleDateString();
+        const date = this.escapeLatex(rawDate);
 
         // Get author from configuration, default to 'Author' if not set
         const config = vscode.workspace.getConfiguration('gitforwriter');
@@ -428,8 +429,8 @@ ${content}
                     // Move PDF to desired location if different
                     if (generatedPdfPath !== pdfPath) {
                         // Use copy + unlink instead of rename for better cross-platform compatibility
-                        fs.copyFileSync(generatedPdfPath, pdfPath);
-                        fs.unlinkSync(generatedPdfPath);
+                        await fs.promises.copyFile(generatedPdfPath, pdfPath);
+                        await fs.promises.unlink(generatedPdfPath);
                     }
 
                     // Open PDF after compilation
@@ -469,6 +470,12 @@ ${content}
             );
         }
 
+        // Set up AbortController for cancellation support
+        const controller = new AbortController();
+        const cancellationListener = token?.onCancellationRequested(() => {
+            controller.abort();
+        });
+
         try {
             // Run compiler with options:
             // -interaction=nonstopmode: don't stop on errors, continue to get full error log
@@ -477,7 +484,8 @@ ${content}
 
             const { stderr } = await execFileAsync(compiler, args, {
                 cwd: workDir,
-                timeout: 60000 // 60 second timeout
+                timeout: 60000, // 60 second timeout
+                signal: controller.signal
             });
 
             // Check for errors in output (case-insensitive, and LaTeX error indicators)
@@ -492,6 +500,11 @@ ${content}
                 }
             }
         } catch (error: any) {
+            // Check if the error is due to cancellation
+            if (error.code === 'ABORT_ERR' || error.name === 'AbortError') {
+                throw new ExportError('Compilation cancelled', 'COMPILATION_CANCELLED');
+            }
+
             // Parse LaTeX error messages
             const errorMessage = this.parseLatexError(error.message || error.toString());
             throw new ExportError(
@@ -500,6 +513,9 @@ ${content}
                 error,
                 { compiler, texFileName }
             );
+        } finally {
+            // Clean up cancellation listener
+            cancellationListener?.dispose();
         }
     }
 
