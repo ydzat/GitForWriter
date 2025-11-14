@@ -27,6 +27,42 @@ export class ExportManager {
     private compilersDetected: boolean = false;
     private detectionPromise: Promise<void> | null = null;
 
+    // Static language mapping for code block syntax highlighting
+    private static readonly LANGUAGE_MAP: { [key: string]: string } = {
+        'js': 'JavaScript',
+        'javascript': 'JavaScript',
+        'ts': 'JavaScript',  // TypeScript uses JavaScript highlighting
+        'typescript': 'JavaScript',
+        'py': 'Python',
+        'python': 'Python',
+        'java': 'Java',
+        'cpp': 'C++',
+        'c++': 'C++',
+        'c': 'C',
+        'cs': '[Sharp]C',
+        'csharp': '[Sharp]C',
+        'c#': '[Sharp]C',
+        'f#': 'ML',  // F# uses ML highlighting
+        'fsharp': 'ML',
+        'rb': 'Ruby',
+        'ruby': 'Ruby',
+        'go': 'Go',
+        'rust': 'Rust',
+        'php': 'PHP',
+        'sql': 'SQL',
+        'bash': 'bash',
+        'sh': 'bash',
+        'html': 'HTML',
+        'xml': 'XML',
+        'json': 'JavaScript',  // JSON uses JavaScript highlighting
+        'yaml': 'Python',  // YAML uses Python-like highlighting
+        'yml': 'Python',
+        'objective-c': 'Objective-C',
+        'objc': 'Objective-C',
+        'x86-64': 'Assembler',
+        'assembly': 'Assembler'
+    };
+
     constructor() {
         // Compiler detection will be done lazily on first use
     }
@@ -337,24 +373,25 @@ ${content}
         // Step 8: Convert blockquotes (use placeholder to track state)
         latex = this.convertBlockquotes(latex);
 
-        // Step 9: Convert bold and italic (with escaping, avoid conflicts with math)
+        // Step 9: Convert horizontal rules (before bold/italic to avoid *** being treated as formatting)
+        latex = latex.replace(/^---$/gm, '\\hrule');
+        latex = latex.replace(/^\*\*\*$/gm, '\\hrule');
+
+        // Step 10: Convert bold and italic (with escaping, avoid conflicts with math)
         latex = latex.replace(/\*\*(.+?)\*\*/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
         latex = latex.replace(/\*(.+?)\*/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
         latex = latex.replace(/__(.+?)__/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
         latex = latex.replace(/_(.+?)_/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
 
-        // Step 10: Convert code blocks with syntax highlighting
+        // Step 11: Convert code blocks with syntax highlighting
         latex = this.convertCodeBlocks(latex);
 
-        // Step 11: Convert inline code (escape special chars in code)
+        // Step 12: Convert inline code (escape special chars in code)
         latex = latex.replace(/`(.+?)`/g, (_, code) => `\\texttt{${this.escapeLatex(code)}}`);
 
-        // Step 12: Convert links (escape link text)
+        // Step 13: Convert links (escape link text)
         latex = latex.replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => `\\href{${url}}{${this.escapeLatex(text)}}`);
 
-        // Step 13: Convert horizontal rules
-        latex = latex.replace(/^---$/gm, '\\hrule');
-        latex = latex.replace(/^\*\*\*$/gm, '\\hrule');
 
         // Step 14: Convert lists (both unordered and ordered)
         latex = this.convertLists(latex);
@@ -383,8 +420,20 @@ ${content}
                 const headerLine = line;
                 const separatorLine = lines[i + 1];
 
-                // Verify it's a table by checking separator line (strict validation)
-                if (separatorLine.match(/^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/)) {
+                // Verify it's a table by checking separator line (supports single-column tables)
+                if (separatorLine.match(/^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/)) {
+                    // Validate column count matches between header and separator
+                    const headerCols = headerLine.split('|').map(col => col.trim()).filter(col => col.length > 0);
+                    const separatorCols = separatorLine.split('|').map(col => col.trim()).filter(col => col.length > 0);
+
+                    if (headerCols.length !== separatorCols.length) {
+                        // Malformed table: skip conversion, push original lines
+                        result.push(headerLine);
+                        result.push(separatorLine);
+                        i += 2;
+                        continue;
+                    }
+
                     // Parse table
                     const tableLines: string[] = [headerLine];
                     let j = i + 2;
@@ -449,10 +498,12 @@ ${content}
 
     /**
      * Convert code blocks with language-specific syntax highlighting
+     * Supports language identifiers with hyphens, plus signs, and hash symbols
+     * (e.g., objective-c, c++, c#, f#, x86-64)
      */
     private convertCodeBlocks(markdown: string): string {
-        // Flexible pattern: optional whitespace/newlines after opening and before closing fence
-        return markdown.replace(/```(\w+)?\s*\n?([\s\S]+?)\n?```/g, (_, lang, code) => {
+        // Flexible pattern: supports alphanumeric, hyphens, plus, hash in language identifier
+        return markdown.replace(/```([a-zA-Z0-9_+\-#]+)?\s*\n?([\s\S]+?)\n?```/g, (_, lang, code) => {
             if (lang) {
                 // Use listings package for syntax highlighting
                 return `\\begin{lstlisting}[language=${this.mapLanguage(lang)}]\n${code}\\end{lstlisting}`;
@@ -465,37 +516,10 @@ ${content}
 
     /**
      * Map common language names to listings package names
+     * Uses static LANGUAGE_MAP to avoid recreating the map on every call
      */
     private mapLanguage(lang: string): string {
-        const languageMap: { [key: string]: string } = {
-            'js': 'JavaScript',
-            'javascript': 'JavaScript',
-            'ts': 'JavaScript',  // TypeScript uses JavaScript highlighting
-            'typescript': 'JavaScript',
-            'py': 'Python',
-            'python': 'Python',
-            'java': 'Java',
-            'cpp': 'C++',
-            'c++': 'C++',
-            'c': 'C',
-            'cs': '[Sharp]C',
-            'csharp': '[Sharp]C',
-            'rb': 'Ruby',
-            'ruby': 'Ruby',
-            'go': 'Go',
-            'rust': 'Rust',
-            'php': 'PHP',
-            'sql': 'SQL',
-            'bash': 'bash',
-            'sh': 'bash',
-            'html': 'HTML',
-            'xml': 'XML',
-            'json': 'JavaScript',  // JSON uses JavaScript highlighting
-            'yaml': 'Python',  // YAML uses Python-like highlighting
-            'yml': 'Python'
-        };
-
-        return languageMap[lang.toLowerCase()] || lang;
+        return ExportManager.LANGUAGE_MAP[lang.toLowerCase()] || lang;
     }
 
     /**
@@ -576,11 +600,11 @@ ${content}
                 result.push(`\\begin{${listType}}`);
                 inList = true;
 
-                // Convert the list item
+                // Convert the list item (use trimmedLine for consistent matching)
                 if (isUnorderedItem) {
-                    result.push(line.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
+                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
                 } else {
-                    result.push(line.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
+                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
                 }
             } else if (isListItem && inList) {
                 // Check if list type is changing
@@ -591,11 +615,11 @@ ${content}
                     result.push(`\\begin{${listType}}`);
                 }
 
-                // Convert the list item
+                // Convert the list item (use trimmedLine for consistent matching)
                 if (isUnorderedItem) {
-                    result.push(line.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
+                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
                 } else {
-                    result.push(line.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
+                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
                 }
             } else if (!isListItem && !isEmptyLine && inList) {
                 // Ending the list

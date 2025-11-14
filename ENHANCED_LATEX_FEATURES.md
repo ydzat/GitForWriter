@@ -20,15 +20,59 @@ The enhanced LaTeX conversion now supports advanced Markdown features including:
 
 **Raw LaTeX Passthrough**: This feature allows arbitrary LaTeX commands to be preserved and executed during compilation. If you process untrusted Markdown content, this poses a security risk:
 
-- Malicious users could inject LaTeX commands that write to the filesystem
-- Commands like `\input` could include sensitive files
-- Shell commands could be executed if shell-escape is enabled
+- Malicious users could inject LaTeX commands that write to the filesystem, execute shell commands, or read sensitive files.
+- **Example of a malicious LaTeX command**:
+  ```latex
+  \immediate\write18{rm -rf /}
+  ```
+  This command would attempt to delete all files on the system if shell-escape is enabled.
+- Commands like `\input{../../etc/passwd}` could include sensitive files.
+- Shell commands could be executed if shell-escape is enabled.
 
-**Recommendations**:
-- Only process trusted Markdown content
-- Disable shell-escape in LaTeX compilation for untrusted content
-- Consider adding a configuration option to disable raw LaTeX passthrough when processing user-submitted content
-- Be especially cautious in web applications or shared editing environments
+**Mitigation Strategies**:
+
+1. **Only process trusted Markdown content** - Never compile LaTeX from untrusted sources without sanitization.
+
+2. **Disable shell-escape** in LaTeX compilation for untrusted content. Use the `-no-shell-escape` flag:
+   ```bash
+   pdflatex -no-shell-escape document.tex
+   xelatex -no-shell-escape document.tex
+   ```
+
+3. **Avoid or allow-list safe LaTeX packages**. Dangerous packages include:
+   - `shellesc` - Enables shell command execution
+   - `write18` - Allows writing to arbitrary files
+   - `catchfile` - Can read arbitrary files
+   - `filecontents` - Can write arbitrary files
+
+4. **Consider adding a configuration option** to disable raw LaTeX passthrough when processing user-submitted content.
+
+5. **Be especially cautious** in web applications or shared editing environments.
+
+**Example: Sanitizing Raw LaTeX Blocks**
+
+Before passing raw LaTeX to the compiler, you can filter out dangerous commands:
+
+```typescript
+function sanitizeLatex(latexStr: string): string {
+    // Block dangerous commands
+    const forbidden = [
+        /\\write18/,
+        /\\input/,
+        /\\include/,
+        /\\openout/,
+        /\\read/,
+        /\\usepackage\{shellesc\}/
+    ];
+
+    for (const pattern of forbidden) {
+        if (pattern.test(latexStr)) {
+            throw new Error("Dangerous LaTeX command detected!");
+        }
+    }
+    return latexStr;
+}
+```
 
 ## Known Limitations
 
