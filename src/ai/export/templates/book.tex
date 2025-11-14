@@ -1,0 +1,65 @@
+% Book Template for GitForWriter
+\documentclass[11pt,twoside]{book}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+% Page layout
+\geometry{
+    a5paper,
+    margin=2cm,
+    bindingoffset=1cm
+}
+
+% Chapter formatting
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{0pt}{40pt}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[RE]{\leftmark}
+\fancyhead[LO]{\rightmark}
+
+% Title information
+\title{{{TITLE}}}
+\author{{{AUTHOR}}}
+\date{{{DATE}}}
+
+\begin{document}
+
+% Front matter
+\frontmatter
+
+% Custom title page
+\begin{titlepage}
+    \centering
+    \vspace*{3cm}
+    {\Huge \bfseries{{{TITLE}}}\par}
+    \vspace{2cm}
+    {\Large{{{AUTHOR}}}\par}
+    \vspace{1cm}
+    {\large{{{DATE}}}\par}
+    \vfill
+\end{titlepage}
+
+\tableofcontents
+
+% Main content
+\mainmatter
+
+{{CONTENT}}
+
+% Back matter
+\backmatter
+
+\end{document}
+

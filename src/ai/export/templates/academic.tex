@@ -1,0 +1,63 @@
+% Academic Paper Template for GitForWriter
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{cite}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+
+% Page layout
+\geometry{margin=1in}
+\onehalfspacing
+
+% Title information
+\title{{{TITLE}}}
+\author{{{AUTHOR}}}
+\date{{{DATE}}}
+
+% Abstract environment
+\renewenvironment{abstract}
+ {\small
+  \begin{center}
+  \bfseries \abstractname\vspace{-.5em}\vspace{0pt}
+  \end{center}
+  \list{}{
+    \setlength{\leftmargin}{.5in}
+    \setlength{\rightmargin}{\leftmargin}
+  }
+  \item\relax}
+ {\endlist}
+
+\begin{document}
+
+\maketitle
+
+% Header and footer (set after \maketitle to avoid affecting title page)
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\thepage}
+\lhead{\nouppercase{\leftmark}}
+
+% To add an abstract, uncomment the following lines and provide your abstract content:
+% \begin{abstract}
+% Your abstract text here.
+% \end{abstract}
+
+% Main content
+% Note: If your content already includes \section{Introduction} or \section{Conclusion},
+% you may want to remove the template sections below or use a different template.
+{{CONTENT}}
+
+% Bibliography
+% Uncomment and configure if you have a references.bib file
+% \bibliographystyle{plain}
+% \bibliography{references}
+
+\end{document}
+

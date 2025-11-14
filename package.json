@@ -156,14 +156,63 @@
           "type": "string",
           "default": "llama2",
           "description": "Local LLM model name"
+        },
+        "gitforwriter.latex.template": {
+          "type": "string",
+          "enum": [
+            "default",
+            "academic",
+            "book",
+            "article"
+          ],
+          "default": "default",
+          "description": "LaTeX template to use for export"
+        },
+        "gitforwriter.latex.author": {
+          "type": "string",
+          "default": "",
+          "description": "Author name for LaTeX documents (leave empty to use 'Author')"
+        },
+        "gitforwriter.latex.compiler": {
+          "type": "string",
+          "enum": [
+            "pdflatex",
+            "xelatex",
+            "lualatex"
+          ],
+          "default": "pdflatex",
+          "description": "LaTeX compiler to use for PDF generation"
+        },
+        "gitforwriter.latex.multiPass": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run LaTeX compiler multiple times to resolve references"
+        },
+        "gitforwriter.latex.cleanAuxFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically clean auxiliary files (.aux, .log, etc.) after compilation"
+        },
+        "gitforwriter.latex.openAfterCompile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open PDF file after successful compilation"
+        },
+        "gitforwriter.latex.timeout": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 10000,
+          "maximum": 600000,
+          "description": "Timeout for LaTeX compilation in milliseconds (10-600 seconds)"
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/copy-templates.js",
     "watch": "tsc -watch -p ./",
+    "copy-templates": "node scripts/copy-templates.js",
     "clean": "rimraf out",
     "lint": "eslint src --ext ts",
     "pretest": "npm run compile",
