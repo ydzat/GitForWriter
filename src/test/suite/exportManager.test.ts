@@ -286,8 +286,9 @@ Test content
     test('should fallback to default template if template file not found', async () => {
         const config = vscode.workspace.getConfiguration('gitforwriter');
         try {
-            // Use a non-existent template name to test fallback behavior
-            await config.update('latex.template', 'nonexistent_template_xyz', vscode.ConfigurationTarget.WorkspaceFolder);
+            // Use a non-existent template name to test fallback behavior.
+            // Type assertion is intentional to bypass enum restriction for this test.
+            await config.update('latex.template', 'nonexistent_template_xyz' as any, vscode.ConfigurationTarget.WorkspaceFolder);
 
             const outputPath = await exportManager.export(testDocument, 'latex');
             const content = fs.readFileSync(outputPath, 'utf-8');

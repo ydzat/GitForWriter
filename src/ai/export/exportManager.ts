@@ -115,7 +115,13 @@ generator: GitForWriter
     private escapeLatex(text: string): string {
         return text
             .replace(/\\/g, '\\textbackslash{}')
-            .replace(/[&%$#_{}]/g, '\\$&')
+            .replace(/&/g, '\\&')
+            .replace(/%/g, '\\%')
+            .replace(/\$/g, '\\$')
+            .replace(/#/g, '\\#')
+            .replace(/_/g, '\\_')
+            .replace(/{/g, '\\{')
+            .replace(/}/g, '\\}')
             .replace(/~/g, '\\textasciitilde{}')
             .replace(/\^/g, '\\textasciicircum{}');
     }
@@ -377,7 +383,7 @@ ${content}
                         secondPassIncrement = 25;
                         finalPassIncrement = 25;
                         cleanIncrement = options.cleanAuxFiles ? 15 : 0;
-                        doneIncrement = 10;
+                        doneIncrement = options.cleanAuxFiles ? 10 : 25;  // Adjust based on cleanAuxFiles
                     } else {
                         // Single compilation pass
                         firstPassIncrement = options.cleanAuxFiles ? 70 : 85;

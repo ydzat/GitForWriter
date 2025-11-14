@@ -11,6 +11,12 @@ const path = require('path');
 const srcTemplatesDir = path.join(__dirname, '..', 'src', 'ai', 'export', 'templates');
 const outTemplatesDir = path.join(__dirname, '..', 'out', 'ai', 'export', 'templates');
 
+// Check if source templates directory exists
+if (!fs.existsSync(srcTemplatesDir)) {
+    console.error(`Error: Source templates directory not found: ${srcTemplatesDir}`);
+    process.exit(1);
+}
+
 // Create output directory if it doesn't exist
 if (!fs.existsSync(outTemplatesDir)) {
     fs.mkdirSync(outTemplatesDir, { recursive: true });
