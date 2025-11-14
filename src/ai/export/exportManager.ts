@@ -110,15 +110,28 @@ generator: GitForWriter
     }
 
     /**
+     * Escape LaTeX special characters
+     */
+    private escapeLatex(text: string): string {
+        return text
+            .replace(/\\/g, '\\textbackslash{}')
+            .replace(/[&%$#_{}]/g, '\\$&')
+            .replace(/~/g, '\\textasciitilde{}')
+            .replace(/\^/g, '\\textasciicircum{}');
+    }
+
+    /**
      * Apply a LaTeX template to content
      */
     private applyTemplate(content: string, outputPath: string, templateType: TemplateType): string {
-        const title = path.basename(outputPath, '.tex').replace(/_/g, ' ');
+        const rawTitle = path.basename(outputPath, '.tex').replace(/_/g, ' ');
+        const title = this.escapeLatex(rawTitle);
         const date = new Date().toLocaleDateString();
 
         // Get author from configuration, default to 'Author' if not set
         const config = vscode.workspace.getConfiguration('gitforwriter');
-        const author = config.get<string>('latex.author', '') || 'Author';
+        const rawAuthor = config.get<string>('latex.author', '') || 'Author';
+        const author = this.escapeLatex(rawAuthor);
 
         if (templateType === 'default') {
             return `\\documentclass{article}
@@ -126,6 +139,7 @@ generator: GitForWriter
 \\usepackage{hyperref}
 
 \\title{${title}}
+\\author{${author}}
 \\date{${date}}
 
 \\begin{document}
@@ -147,7 +161,6 @@ ${content}
             template = template.replace(/\{\{AUTHOR\}\}/g, author);
             template = template.replace(/\{\{DATE\}\}/g, date);
             template = template.replace(/\{\{CONTENT\}\}/g, content);
-            template = template.replace(/\{\{ABSTRACT\}\}/g, ''); // Empty abstract by default
 
             return template;
         }
@@ -318,6 +331,12 @@ ${content}
             const compiler = this.availableCompilers.find(c => c.name === preferredCompiler);
             if (compiler) {
                 return compiler;
+            }
+            // Preferred compiler not found, warn user if falling back
+            if (this.availableCompilers.length > 0) {
+                vscode.window.showWarningMessage(
+                    `Preferred LaTeX compiler '${preferredCompiler}' not found. Using '${this.availableCompilers[0].name}' instead.`
+                );
             }
         }
         return this.availableCompilers[0] || null;
