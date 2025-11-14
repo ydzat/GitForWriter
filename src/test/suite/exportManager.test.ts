@@ -280,16 +280,19 @@ Test content
 
     test('should fallback to default template if template file not found', async () => {
         const config = vscode.workspace.getConfiguration('gitforwriter');
-        // Use a non-existent template name (will be handled by fallback)
-        await config.update('latex.template', 'default', vscode.ConfigurationTarget.Global);
+        // Use a non-existent template name to test fallback behavior
+        await config.update('latex.template', 'nonexistent_template_xyz', vscode.ConfigurationTarget.Global);
 
         const outputPath = await exportManager.export(testDocument, 'latex');
         const content = fs.readFileSync(outputPath, 'utf-8');
 
-        // Should still generate valid LaTeX
+        // Should fallback to default template and still generate valid LaTeX
         assert.ok(content.includes('\\documentclass'), 'Should have document class');
         assert.ok(content.includes('\\begin{document}'), 'Should have document begin');
         assert.ok(content.includes('\\end{document}'), 'Should have document end');
+
+        // Reset to default
+        await config.update('latex.template', 'default', vscode.ConfigurationTarget.Global);
     });
 });
 

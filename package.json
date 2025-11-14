@@ -168,6 +168,11 @@
           "default": "default",
           "description": "LaTeX template to use for export"
         },
+        "gitforwriter.latex.author": {
+          "type": "string",
+          "default": "",
+          "description": "Author name for LaTeX documents (leave empty to use 'Author')"
+        },
         "gitforwriter.latex.compiler": {
           "type": "string",
           "enum": [

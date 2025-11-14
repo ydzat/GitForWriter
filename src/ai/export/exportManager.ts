@@ -115,7 +115,10 @@ generator: GitForWriter
     private applyTemplate(content: string, outputPath: string, templateType: TemplateType): string {
         const title = path.basename(outputPath, '.tex').replace(/_/g, ' ');
         const date = new Date().toLocaleDateString();
-        const author = 'Author'; // Could be made configurable
+
+        // Get author from configuration, default to 'Author' if not set
+        const config = vscode.workspace.getConfiguration('gitforwriter');
+        const author = config.get<string>('latex.author', '') || 'Author';
 
         if (templateType === 'default') {
             return `\\documentclass{article}
@@ -176,13 +179,16 @@ Or use online tools like Overleaf.`;
                 'Learn More'
             );
 
+            // Handle user selection and wait for all UI operations to complete
             if (selection === 'Open LaTeX File') {
                 const doc = await vscode.workspace.openTextDocument(texPath);
                 await vscode.window.showTextDocument(doc);
             } else if (selection === 'Learn More') {
-                vscode.env.openExternal(vscode.Uri.parse('https://www.latex-project.org/get/'));
+                // openExternal is fire-and-forget, but we can await it for consistency
+                await vscode.env.openExternal(vscode.Uri.parse('https://www.latex-project.org/get/'));
             }
 
+            // All UI operations complete, now throw the error
             throw new ExportError(
                 'PDF export requires LaTeX installation. LaTeX file generated instead.',
                 'LATEX_NOT_FOUND',
@@ -246,18 +252,24 @@ Or use online tools like Overleaf.`;
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const isListItem = line.trim().startsWith('\\item');
-            
+
             if (isListItem && !inList) {
+                // Starting a new list
                 result.push('\\begin{itemize}');
                 inList = true;
+                result.push(line);
             } else if (!isListItem && inList) {
+                // Ending the list before adding non-list line
                 result.push('\\end{itemize}');
                 inList = false;
+                result.push(line);
+            } else {
+                // Continue in current state
+                result.push(line);
             }
-            
-            result.push(line);
         }
 
+        // Close any unclosed list at the end
         if (inList) {
             result.push('\\end{itemize}');
         }
@@ -399,8 +411,7 @@ Or use online tools like Overleaf.`;
 
         try {
             // Run compiler with options:
-            // -interaction=nonstopmode: don't stop on errors
-            // -halt-on-error: stop on first error
+            // -interaction=nonstopmode: don't stop on errors, continue to get full error log
             // -file-line-error: show file and line number in errors
             const command = `${compiler} -interaction=nonstopmode -file-line-error "${texFileName}"`;
 

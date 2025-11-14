@@ -77,7 +77,8 @@ Select a document template:
 {
   "gitforwriter.latex.multiPass": true,        // Run compiler multiple times for references
   "gitforwriter.latex.cleanAuxFiles": true,    // Clean .aux, .log files after compilation
-  "gitforwriter.latex.openAfterCompile": true  // Open PDF automatically
+  "gitforwriter.latex.openAfterCompile": true, // Open PDF automatically
+  "gitforwriter.latex.author": "Your Name"     // Author name for documents (optional)
 }
 ```
 
