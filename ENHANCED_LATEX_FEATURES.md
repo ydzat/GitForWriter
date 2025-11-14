@@ -34,15 +34,32 @@ The enhanced LaTeX conversion now supports advanced Markdown features including:
 
 1. **Special Character Escaping**: All user content (headings, table cells, footnotes, etc.) is automatically escaped for LaTeX special characters. However, content within math equations and raw LaTeX blocks is preserved as-is.
 
-2. **Nested Structures**: Complex nested structures (e.g., lists within blockquotes, tables within lists) may not be fully supported.
+2. **Nested Lists**: The list conversion does not currently support nested lists with indentation. Lists like:
+   ```markdown
+   - Item 1
+     - Subitem 1.1
+   ```
+   will be treated as flat lists. Nested list support may be added in future versions.
 
-3. **Image Width**: Image width is currently hardcoded to `0.8\textwidth`. This may be made configurable in future versions.
+3. **Nested Structures**: Complex nested structures (e.g., lists within blockquotes, tables within lists) may not be fully supported.
 
-4. **Code Block Formatting**: Code blocks require a newline after the opening fence and before the closing fence. Inline-style code blocks without newlines are not supported.
+4. **Image Width**: Image width is currently hardcoded to `0.8\textwidth`. This may be made configurable in future versions.
 
-5. **Bold/Italic in Headings**: Formatting markers within headings are processed, but complex nested formatting may not work as expected.
+5. **Multi-line Footnotes**: Footnotes support multi-line content when indented with 4 spaces or a tab, but complex formatting within footnotes may not work as expected.
 
-6. **Citation Format**: Only supports basic `[@ref]` and `[@ref1; @ref2]` citation formats. Advanced citation features may require manual LaTeX editing.
+6. **Bold/Italic in Headings**: Formatting markers within headings are processed, but complex nested formatting may not work as expected.
+
+7. **Citation Format**: Only supports basic `[@ref]` and `[@ref1; @ref2]` citation formats. Advanced citation features may require manual LaTeX editing.
+
+## Future Improvements
+
+1. **Modular Architecture**: The current `convertMarkdownToLatex()` method contains a 15-step conversion pipeline. Future versions may refactor this into separate, testable converter classes following the Single Responsibility Principle.
+
+2. **Configurable Conversions**: Allow users to enable/disable specific conversion features through configuration.
+
+3. **Nested List Support**: Add proper handling of indented nested lists with multiple levels.
+
+4. **Configurable Image Width**: Make image width configurable per-image or globally.
 
 ## Feature Details
 

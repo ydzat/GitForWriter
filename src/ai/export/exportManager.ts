@@ -290,10 +290,12 @@ ${content}
         });
 
         // Step 3: Convert footnotes
-        // Collect footnote definitions
+        // Collect footnote definitions (supports multi-line footnotes with indentation)
         const footnotes: Map<string, string> = new Map();
-        latex = latex.replace(/^\[\^(\w+)\]:\s*(.+)$/gm, (_, id, text) => {
-            footnotes.set(id, this.escapeLatex(text));
+        latex = latex.replace(/^\[\^(\w+)\]:\s*(.+(?:\n(?:    |\t).+)*)$/gm, (_, id, text) => {
+            // Remove indentation from multi-line footnotes
+            const cleanedText = text.replace(/\n(?:    |\t)/g, ' ');
+            footnotes.set(id, this.escapeLatex(cleanedText));
             return '';  // Remove definition from main text
         });
 
@@ -448,8 +450,8 @@ ${content}
      * Convert code blocks with language-specific syntax highlighting
      */
     private convertCodeBlocks(markdown: string): string {
-        // More flexible pattern to handle optional whitespace and newlines
-        return markdown.replace(/```(\w+)?\s*\n([\s\S]+?)\n```/g, (_, lang, code) => {
+        // Flexible pattern: optional whitespace/newlines after opening and before closing fence
+        return markdown.replace(/```(\w+)?\s*\n?([\s\S]+?)\n?```/g, (_, lang, code) => {
             if (lang) {
                 // Use listings package for syntax highlighting
                 return `\\begin{lstlisting}[language=${this.mapLanguage(lang)}]\n${code}\\end{lstlisting}`;
