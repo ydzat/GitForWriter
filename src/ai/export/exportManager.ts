@@ -111,10 +111,11 @@ generator: GitForWriter
 
     /**
      * Escape LaTeX special characters
-     * Process each character separately to avoid double-escaping
+     * Process backslash first to avoid double-escaping
      */
     private escapeLatex(text: string): string {
         return text
+            .replace(/\\/g, '\\textbackslash{}')  // Process backslash first
             .replace(/&/g, '\\&')
             .replace(/%/g, '\\%')
             .replace(/\$/g, '\\$')
@@ -123,8 +124,7 @@ generator: GitForWriter
             .replace(/{/g, '\\{')
             .replace(/}/g, '\\}')
             .replace(/~/g, '\\textasciitilde{}')
-            .replace(/\^/g, '\\textasciicircum{}')
-            .replace(/\\/g, '\\textbackslash{}');  // Process backslash last
+            .replace(/\^/g, '\\textasciicircum{}');
     }
 
     /**
@@ -331,7 +331,15 @@ ${content}
             try {
                 // Check if compiler is available by running --version
                 const { stdout } = await execFileAsync(compiler.command, ['--version']);
-                if (stdout) {
+                // Verify that stdout contains expected version information
+                if (
+                    stdout &&
+                    (
+                        (compiler.name === 'pdflatex' && /pdfTeX|pdflatex/i.test(stdout)) ||
+                        (compiler.name === 'xelatex' && /XeTeX|xelatex/i.test(stdout)) ||
+                        (compiler.name === 'lualatex' && /LuaTeX|lualatex/i.test(stdout))
+                    )
+                ) {
                     this.availableCompilers.push({
                         name: compiler.name,
                         command: compiler.command,
@@ -482,8 +490,8 @@ ${content}
             throw new ExportError('Compilation cancelled', 'COMPILATION_CANCELLED');
         }
 
-        // Validate filename to prevent potential issues with special characters
-        if (!texFileName.endsWith('.tex') || texFileName.includes('..') || /[<>:"|?*]/.test(texFileName)) {
+        // Validate filename to prevent potential issues with special characters and path traversal
+        if (!texFileName.endsWith('.tex') || texFileName.includes('..') || /[<>:"|?*\\/]/.test(texFileName)) {
             throw new ExportError(
                 'Invalid filename for LaTeX compilation',
                 'INVALID_FILENAME'
@@ -502,9 +510,13 @@ ${content}
             // -file-line-error: show file and line number in errors
             const args = ['-interaction=nonstopmode', '-file-line-error', texFileName];
 
+            // Get timeout from configuration
+            const config = vscode.workspace.getConfiguration('gitforwriter');
+            const timeout = config.get<number>('latex.timeout', 60000);
+
             const { stderr } = await execFileAsync(compiler, args, {
                 cwd: workDir,
-                timeout: 60000, // 60 second timeout
+                timeout: timeout,
                 signal: controller.signal
             });
 

@@ -197,6 +197,13 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically open PDF file after successful compilation"
+        },
+        "gitforwriter.latex.timeout": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 10000,
+          "maximum": 600000,
+          "description": "Timeout for LaTeX compilation in milliseconds (10-600 seconds)"
         }
       }
     }

@@ -27,7 +27,8 @@ if (!fs.existsSync(outTemplatesDir)) {
 const files = fs.readdirSync(srcTemplatesDir);
 const texFiles = files.filter(f => f.endsWith('.tex'));
 
-texFiles.forEach(file => {
+// Use for...of instead of forEach to allow proper error handling
+for (const file of texFiles) {
     const srcPath = path.join(srcTemplatesDir, file);
     const destPath = path.join(outTemplatesDir, file);
 
@@ -38,7 +39,7 @@ texFiles.forEach(file => {
         console.error(`Failed to copy ${file}:`, error.message);
         process.exit(1);
     }
-});
+}
 
 console.log(`✅ Copied ${texFiles.length} template file(s) to output directory`);
 
