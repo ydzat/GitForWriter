@@ -41,7 +41,7 @@ The enhanced LaTeX conversion now supports advanced Markdown features including:
 
    **Note:** This extension does *not* currently enforce `-no-shell-escape` by default for all compilations. Users should manually ensure this flag is set for secure compilation. Those who need shell-escape for specific use cases can enable it manually in their settings.
 
-3. **Avoid or allow-list safe LaTeX packages**. Dangerous packages include:
+3. **Avoid or allowlist safe LaTeX packages**. Dangerous packages include:
    - `shellesc` - Enables shell command execution
    - `write18` - Allows writing to arbitrary files
    - `catchfile` - Can read arbitrary files

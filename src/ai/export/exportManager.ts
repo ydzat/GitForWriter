@@ -170,9 +170,11 @@ generator: GitForWriter
      * Escape special LaTeX characters in URLs
      * Only escapes characters that break LaTeX, preserves URL structure
      * Does not escape : / ? = . which are part of URL syntax
+     * SECURITY: Backslash must be escaped first to prevent LaTeX command injection
      */
     private escapeUrl(url: string): string {
         return url
+            .replace(/\\/g, '\\textbackslash{}')  // Escape backslash first to prevent command injection
             .replace(/#/g, '\\#')
             .replace(/%/g, '\\%')
             .replace(/&/g, '\\&')
@@ -388,31 +390,33 @@ ${content}
         latex = latex.replace(/^### (.+)$/gm, (_, heading) => `\\subsubsection{${this.escapeLatex(heading)}}`);
         latex = latex.replace(/^#### (.+)$/gm, (_, heading) => `\\paragraph{${this.escapeLatex(heading)}}`);
 
-        // Step 8: Convert blockquotes (use placeholder to track state)
-        latex = this.convertBlockquotes(latex);
-
-        // Step 9: Convert horizontal rules (before bold/italic to avoid *** being treated as formatting)
+        // Step 8: Convert horizontal rules (before bold/italic to avoid *** being treated as formatting)
         // Supports ---, ***, ___, and variants with spaces (e.g., * * *, - - -)
         latex = latex.replace(/^\s*(?:[-*_]\s*){3,}$/gm, '\\hrule');
 
-        // Step 10: Convert bold and italic (with escaping, avoid conflicts with math)
+        // Step 9: Convert bold and italic (with escaping, avoid conflicts with math)
         latex = latex.replace(/\*\*(.+?)\*\*/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
-        latex = latex.replace(/\*(.+?)\*/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
+        // Use negative lookahead/lookbehind to avoid matching asterisks that are part of bold markers
+        latex = latex.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
         latex = latex.replace(/__(.+?)__/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
         latex = latex.replace(/_(.+?)_/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
 
-        // Step 11: Convert code blocks with syntax highlighting
+        // Step 10: Convert code blocks with syntax highlighting
         latex = this.convertCodeBlocks(latex);
 
-        // Step 12: Convert inline code (escape special chars in code)
+        // Step 11: Convert inline code (escape special chars in code)
         latex = latex.replace(/`(.+?)`/g, (_, code) => `\\texttt{${this.escapeLatex(code)}}`);
 
-        // Step 13: Convert links (escape link text and URL, avoid nested brackets)
+        // Step 12: Convert links (escape link text and URL, avoid nested brackets)
         latex = latex.replace(/\[([^\[\]]+)\]\(([^)]+)\)/g, (_, text, url) => `\\href{${this.escapeUrl(url)}}{${this.escapeLatex(text)}}`);
 
-
-        // Step 14: Convert lists (both unordered and ordered)
+        // Step 13: Convert lists (both unordered and ordered)
+        // Lists are processed AFTER bold/italic/code/links, so those elements are already converted
         latex = this.convertLists(latex);
+
+        // Step 14: Convert blockquotes
+        // Blockquotes are processed AFTER bold/italic/code/links, so those elements are already converted
+        latex = this.convertBlockquotes(latex);
 
         // Step 15: Restore raw LaTeX blocks
         latexBlocks.forEach((block, index) => {
@@ -457,8 +461,9 @@ ${content}
                     let j = i + 2;
 
                     // Collect all table rows, validate column count
+                    // Use same filtering logic as header to support tables without leading/trailing pipes
                     while (j < lines.length && lines[j].includes('|')) {
-                        const rowCols = lines[j].split('|').slice(1, -1);
+                        const rowCols = lines[j].split('|').map(col => col.trim()).filter(col => col.length > 0);
                         // Only include rows with correct column count
                         if (rowCols.length === headerCols.length) {
                             tableLines.push(lines[j]);
@@ -553,6 +558,10 @@ ${content}
      *
      * Note: Uses standard LaTeX quote environment without itemize, treating
      * blockquote lines as regular paragraph text (semantically correct)
+     *
+     * IMPORTANT: Blockquotes are processed in Step 14 (after bold/italic/code/links).
+     * Those earlier steps have already converted and escaped their content, so we
+     * do NOT escape here to avoid double-escaping.
      */
     private convertBlockquotes(markdown: string): string {
         const lines = markdown.split('\n');
@@ -568,13 +577,11 @@ ${content}
                 // Start of blockquote
                 result.push('\\begin{quote}');
                 inQuote = true;
-                // Convert the quote line (remove '>' and escape remaining special chars)
-                // Note: Blockquotes are processed in Step 8, before bold/italic/code/links
-                // Those steps only escape content within their own constructs, not the whole line
-                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
+                // Remove '>' prefix - content is already processed by earlier steps
+                result.push(trimmedLine.substring(1).trim());
             } else if (isQuoteLine && inQuote) {
-                // Continuation of blockquote (escape remaining special chars)
-                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
+                // Continuation of blockquote - content is already processed
+                result.push(trimmedLine.substring(1).trim());
             } else if (!isQuoteLine && inQuote && trimmedLine !== '') {
                 // End of blockquote (non-empty, non-quote line)
                 result.push('\\end{quote}');
@@ -600,6 +607,10 @@ ${content}
     /**
      * Convert both ordered and unordered lists
      * Handles switching between list types (unordered to ordered or vice versa)
+     *
+     * IMPORTANT: Lists are processed in Step 13 (after bold/italic/code/links).
+     * Those earlier steps have already converted and escaped their content, so we
+     * do NOT escape here to avoid double-escaping.
      */
     private convertLists(markdown: string): string {
         const lines = markdown.split('\n');
@@ -626,16 +637,13 @@ ${content}
                 result.push(`\\begin{${listType}}`);
                 inList = true;
 
-                // Convert the list item (escape remaining special chars)
-                // Note: Lists are processed in Step 14, after bold/italic/code/links
-                // However, those steps only escape content within their own constructs
-                // We still need to escape special chars in the remaining text
+                // Extract list item content - already processed by earlier steps
                 if (isUnorderedItem) {
                     const content = trimmedLine.replace(/^([\*\-])\s+(.*)$/, '$2');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(`\\item ${content}`);
                 } else {
                     const content = trimmedLine.replace(/^\d+\.\s+(.*)$/, '$1');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(`\\item ${content}`);
                 }
             } else if (isListItem && inList) {
                 // Check if list type is changing
@@ -646,13 +654,13 @@ ${content}
                     result.push(`\\begin{${listType}}`);
                 }
 
-                // Convert the list item (escape remaining special chars)
+                // Extract list item content - already processed by earlier steps
                 if (isUnorderedItem) {
                     const content = trimmedLine.replace(/^([\*\-])\s+(.*)$/, '$2');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(`\\item ${content}`);
                 } else {
                     const content = trimmedLine.replace(/^\d+\.\s+(.*)$/, '$1');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(`\\item ${content}`);
                 }
             } else if (!isListItem && !isEmptyLine && inList) {
                 // Ending the list
