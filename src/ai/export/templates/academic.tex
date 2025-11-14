@@ -16,12 +16,6 @@
 \geometry{margin=1in}
 \onehalfspacing
 
-% Header and footer
-\pagestyle{fancy}
-\fancyhf{}
-\rhead{\thepage}
-\lhead{\leftmark}
-
 % Title information
 \title{{{TITLE}}}
 \author{{{AUTHOR}}}
@@ -43,6 +37,12 @@
 \begin{document}
 
 \maketitle
+
+% Header and footer (set after \maketitle to avoid affecting title page)
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\thepage}
+\lhead{\nouppercase{\leftmark}}
 
 % To add an abstract, uncomment the following lines and provide your abstract content:
 % \begin{abstract}

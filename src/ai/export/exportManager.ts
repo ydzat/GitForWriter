@@ -111,10 +111,10 @@ generator: GitForWriter
 
     /**
      * Escape LaTeX special characters
+     * Process each character separately to avoid double-escaping
      */
     private escapeLatex(text: string): string {
         return text
-            .replace(/\\/g, '\\textbackslash{}')
             .replace(/&/g, '\\&')
             .replace(/%/g, '\\%')
             .replace(/\$/g, '\\$')
@@ -123,7 +123,8 @@ generator: GitForWriter
             .replace(/{/g, '\\{')
             .replace(/}/g, '\\}')
             .replace(/~/g, '\\textasciitilde{}')
-            .replace(/\^/g, '\\textasciicircum{}');
+            .replace(/\^/g, '\\textasciicircum{}')
+            .replace(/\\/g, '\\textbackslash{}');  // Process backslash last
     }
 
     /**
@@ -215,7 +216,20 @@ ${content}
 
         // Get compilation options from configuration
         const config = vscode.workspace.getConfiguration('gitforwriter');
-        const compilerName = config.get<string>('latex.compiler', 'pdflatex') as 'pdflatex' | 'xelatex' | 'lualatex';
+
+        // Validate compiler name
+        const allowedCompilers = ['pdflatex', 'xelatex', 'lualatex'] as const;
+        const compilerNameRaw = config.get<string>('latex.compiler', 'pdflatex');
+        let compilerName: 'pdflatex' | 'xelatex' | 'lualatex';
+        if (allowedCompilers.includes(compilerNameRaw as any)) {
+            compilerName = compilerNameRaw as 'pdflatex' | 'xelatex' | 'lualatex';
+        } else {
+            vscode.window.showWarningMessage(
+                `Invalid LaTeX compiler "${compilerNameRaw}" in settings. Falling back to "pdflatex".`
+            );
+            compilerName = 'pdflatex';
+        }
+
         const multiPass = config.get<boolean>('latex.multiPass', true);
         const cleanAuxFiles = config.get<boolean>('latex.cleanAuxFiles', true);
         const openAfterCompile = config.get<boolean>('latex.openAfterCompile', true);
@@ -430,7 +444,13 @@ ${content}
                     if (generatedPdfPath !== pdfPath) {
                         // Use copy + unlink instead of rename for better cross-platform compatibility
                         await fs.promises.copyFile(generatedPdfPath, pdfPath);
-                        await fs.promises.unlink(generatedPdfPath);
+                        try {
+                            await fs.promises.unlink(generatedPdfPath);
+                        } catch (unlinkErr) {
+                            vscode.window.showWarningMessage(
+                                `PDF was copied to ${pdfPath}, but failed to remove temporary file: ${generatedPdfPath}. You may need to delete it manually.`
+                            );
+                        }
                     }
 
                     // Open PDF after compilation
@@ -557,12 +577,10 @@ ${content}
 
         for (const ext of extensions) {
             const filePath = path.join(workDir, baseName + ext);
-            if (fs.existsSync(filePath)) {
-                try {
-                    fs.unlinkSync(filePath);
-                } catch (error) {
-                    // Ignore errors when cleaning auxiliary files
-                }
+            try {
+                await fs.promises.unlink(filePath);
+            } catch (error) {
+                // Ignore errors when cleaning auxiliary files (e.g., file does not exist)
             }
         }
     }
