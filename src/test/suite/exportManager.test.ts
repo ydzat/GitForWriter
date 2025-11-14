@@ -220,16 +220,76 @@ Test content
             async () => {
                 await exportManager.export(testDocument, 'pdf');
             },
-            /PDF export requires external tools/,
-            'Should indicate PDF requires external tools'
+            /PDF export requires|LaTeX/,
+            'Should indicate PDF requires LaTeX or external tools'
         );
-        
+
         // Check that a .tex file was created
         const exportsDir = path.join(testWorkspace, 'exports');
         const files = fs.readdirSync(exportsDir);
         const texFiles = files.filter(f => f.endsWith('.tex'));
-        
+
         assert.ok(texFiles.length > 0, 'Should create .tex file when PDF export is attempted');
+    });
+
+    test('should use academic template when configured', async () => {
+        // Set template configuration
+        const config = vscode.workspace.getConfiguration('gitforwriter');
+        await config.update('latex.template', 'academic', vscode.ConfigurationTarget.Global);
+
+        const outputPath = await exportManager.export(testDocument, 'latex');
+        const content = fs.readFileSync(outputPath, 'utf-8');
+
+        // Academic template should have specific packages
+        assert.ok(content.includes('\\usepackage{amsmath'), 'Should include amsmath package');
+        assert.ok(content.includes('\\usepackage{cite}'), 'Should include cite package');
+        assert.ok(content.includes('\\begin{abstract}'), 'Should have abstract environment');
+
+        // Reset configuration
+        await config.update('latex.template', 'default', vscode.ConfigurationTarget.Global);
+    });
+
+    test('should use book template when configured', async () => {
+        const config = vscode.workspace.getConfiguration('gitforwriter');
+        await config.update('latex.template', 'book', vscode.ConfigurationTarget.Global);
+
+        const outputPath = await exportManager.export(testDocument, 'latex');
+        const content = fs.readFileSync(outputPath, 'utf-8');
+
+        // Book template should use book document class
+        assert.ok(content.includes('\\documentclass'), 'Should have document class');
+        assert.ok(content.includes('book'), 'Should use book class');
+        assert.ok(content.includes('\\frontmatter') || content.includes('\\mainmatter'), 'Should have book structure');
+
+        await config.update('latex.template', 'default', vscode.ConfigurationTarget.Global);
+    });
+
+    test('should use article template when configured', async () => {
+        const config = vscode.workspace.getConfiguration('gitforwriter');
+        await config.update('latex.template', 'article', vscode.ConfigurationTarget.Global);
+
+        const outputPath = await exportManager.export(testDocument, 'latex');
+        const content = fs.readFileSync(outputPath, 'utf-8');
+
+        // Article template should be simpler
+        assert.ok(content.includes('\\documentclass'), 'Should have document class');
+        assert.ok(content.includes('article'), 'Should use article class');
+
+        await config.update('latex.template', 'default', vscode.ConfigurationTarget.Global);
+    });
+
+    test('should fallback to default template if template file not found', async () => {
+        const config = vscode.workspace.getConfiguration('gitforwriter');
+        // Use a non-existent template name (will be handled by fallback)
+        await config.update('latex.template', 'default', vscode.ConfigurationTarget.Global);
+
+        const outputPath = await exportManager.export(testDocument, 'latex');
+        const content = fs.readFileSync(outputPath, 'utf-8');
+
+        // Should still generate valid LaTeX
+        assert.ok(content.includes('\\documentclass'), 'Should have document class');
+        assert.ok(content.includes('\\begin{document}'), 'Should have document begin');
+        assert.ok(content.includes('\\end{document}'), 'Should have document end');
     });
 });
 

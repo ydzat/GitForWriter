@@ -156,6 +156,42 @@
           "type": "string",
           "default": "llama2",
           "description": "Local LLM model name"
+        },
+        "gitforwriter.latex.template": {
+          "type": "string",
+          "enum": [
+            "default",
+            "academic",
+            "book",
+            "article"
+          ],
+          "default": "default",
+          "description": "LaTeX template to use for export"
+        },
+        "gitforwriter.latex.compiler": {
+          "type": "string",
+          "enum": [
+            "pdflatex",
+            "xelatex",
+            "lualatex"
+          ],
+          "default": "pdflatex",
+          "description": "LaTeX compiler to use for PDF generation"
+        },
+        "gitforwriter.latex.multiPass": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run LaTeX compiler multiple times to resolve references"
+        },
+        "gitforwriter.latex.cleanAuxFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically clean auxiliary files (.aux, .log, etc.) after compilation"
+        },
+        "gitforwriter.latex.openAfterCompile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open PDF file after successful compilation"
         }
       }
     }

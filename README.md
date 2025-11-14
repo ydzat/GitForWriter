@@ -32,8 +32,14 @@ GitForWriter 是一个 VSCode 插件，旨在探索 AI 与版本控制在创作�
 
 ### 5. 多格式导出
 - **Markdown 导出**：保持原始格式，添加元数据
-- **LaTeX 导出**：自动转换或直接导出 LaTeX 文档
-- **PDF 导出**：通过 LaTeX 生成 PDF（需要外部工具）
+- **LaTeX 导出**：自动转换或直接导出 LaTeX 文档，支持多种模板（学术论文、书籍、文章）
+- **PDF 导出**：✨ **完整 PDF 生成功能**
+  - 自动检测 LaTeX 编译器（pdflatex、xelatex、lualatex）
+  - 多次编译支持（解析引用和目录）
+  - 自动清理辅助文件
+  - 编译进度显示和取消功能
+  - 编译完成后自动打开 PDF
+  - 友好的错误提示和解决建议
 
 ## 📦 安装
 
@@ -83,10 +89,14 @@ npm run compile
 1. 打开命令面板
 2. 运行 "GitForWriter: Export Draft"
 3. 选择导出格式：
-   - Markdown
-   - LaTeX
-   - PDF（需要 pandoc 或 pdflatex）
+   - **Markdown**：保持原始格式
+   - **LaTeX**：使用配置的模板（default/academic/book/article）
+   - **PDF**：自动编译 LaTeX 生成 PDF
 4. 导出文件保存在 `exports` 目录
+
+**PDF 导出要求**：
+- 需要安装 LaTeX 发行版（MiKTeX、MacTeX 或 TeX Live）
+- 详细配置和使用说明请参考 [PDF_EXPORT_GUIDE.md](PDF_EXPORT_GUIDE.md)
 
 ## 📁 项目结构
 
@@ -193,8 +203,10 @@ your-writing-project/
 #### 4. ExportManager（导出管理）
 将创作成果导出为各种格式：
 - 保留源格式（Markdown）
-- 转换为学术格式（LaTeX）
-- 生成出版格式（PDF）
+- 转换为学术格式（LaTeX，支持多种模板）
+- 生成出版格式（PDF，完整编译流程）
+- 自动检测和使用可用的 LaTeX 编译器
+- 智能错误处理和用户友好的提示
 
 #### 5. StatusBarManager（状态管理）
 在 VSCode 状态栏实时显示：
@@ -270,6 +282,20 @@ Unified Provider 通过 Vercel AI SDK 提供对多个 LLM 提供商的统一访�
   "gitforwriter.exportFormat": "markdown" // 默认导出格式
 }
 ```
+
+### LaTeX/PDF 导出配置
+
+```json
+{
+  "gitforwriter.latex.template": "default",        // 模板: default/academic/book/article
+  "gitforwriter.latex.compiler": "pdflatex",       // 编译器: pdflatex/xelatex/lualatex
+  "gitforwriter.latex.multiPass": true,            // 多次编译以解析引用
+  "gitforwriter.latex.cleanAuxFiles": true,        // 编译后清理辅助文件
+  "gitforwriter.latex.openAfterCompile": true      // 编译完成后自动打开 PDF
+}
+```
+
+详细配置说明请参考 [PDF_EXPORT_GUIDE.md](PDF_EXPORT_GUIDE.md)
 
 ## 🛠️ 技术栈
 
