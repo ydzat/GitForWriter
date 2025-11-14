@@ -303,5 +303,230 @@ Test content
             await config.update('latex.template', 'default', vscode.ConfigurationTarget.WorkspaceFolder);
         }
     });
+
+    // Enhanced LaTeX Conversion Tests (Issue #15)
+    suite('Enhanced Markdown to LaTeX Conversion', () => {
+        test('should convert markdown tables to latex tabular', async () => {
+            const testFilePath = path.join(testWorkspace, 'table.md');
+            const content = `# Document with Table
+
+| Name | Age | City |
+|------|-----|------|
+| Alice | 30 | New York |
+| Bob | 25 | London |`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\begin{table}'), 'Should have table environment');
+            assert.ok(latexContent.includes('\\begin{tabular}'), 'Should have tabular environment');
+            assert.ok(latexContent.includes('\\hline'), 'Should have horizontal lines');
+            assert.ok(latexContent.includes('Name & Age & City'), 'Should convert table header');
+            assert.ok(latexContent.includes('Alice & 30 & New York'), 'Should convert table data');
+        });
+
+        test('should convert code blocks with syntax highlighting', async () => {
+            const testFilePath = path.join(testWorkspace, 'code.md');
+            const content = `# Code Example
+
+\`\`\`javascript
+function hello() {
+    console.log("Hello");
+}
+\`\`\``;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\begin{lstlisting}'), 'Should use lstlisting for code');
+            assert.ok(latexContent.includes('[language=JavaScript]'), 'Should specify language');
+        });
+
+        test('should convert images to includegraphics', async () => {
+            const testFilePath = path.join(testWorkspace, 'images.md');
+            const content = `# Document with Images
+
+![Sample Image](./images/sample.png)
+
+![Image with Caption](./image.jpg "This is a caption")`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\begin{figure}'), 'Should have figure environment');
+            assert.ok(latexContent.includes('\\includegraphics'), 'Should use includegraphics');
+            assert.ok(latexContent.includes('\\caption{This is a caption}'), 'Should include caption');
+        });
+
+        test('should convert footnotes', async () => {
+            const testFilePath = path.join(testWorkspace, 'footnotes.md');
+            const content = `# Document with Footnotes
+
+This is a sentence with a footnote[^1].
+
+[^1]: This is the footnote text.`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\footnote{This is the footnote text.}'), 'Should convert footnote');
+        });
+
+        test('should convert inline math equations', async () => {
+            const testFilePath = path.join(testWorkspace, 'math-inline.md');
+            const content = `# Math Document
+
+The equation is $E = mc^2$.`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('$E = mc^2$'), 'Should preserve inline math');
+        });
+
+        test('should convert display math equations', async () => {
+            const testFilePath = path.join(testWorkspace, 'math-display.md');
+            const content = `# Math Document
+
+$$
+\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}
+$$`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\['), 'Should use display math environment');
+            assert.ok(latexContent.includes('\\int_{-\\infty}^{\\infty}'), 'Should preserve math content');
+        });
+
+        test('should convert citations', async () => {
+            const testFilePath = path.join(testWorkspace, 'citations.md');
+            const content = `# Research Paper
+
+According to Smith [@smith2020], this is important.
+
+Multiple sources [@jones2019; @brown2021] agree.`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\cite{smith2020}'), 'Should convert single citation');
+            assert.ok(latexContent.includes('\\cite{jones2019,brown2021}'), 'Should convert multiple citations');
+        });
+
+        test('should preserve raw LaTeX blocks', async () => {
+            const testFilePath = path.join(testWorkspace, 'raw-latex.md');
+            const content = `# Document with Raw LaTeX
+
+\\begin{theorem}
+This is a theorem.
+\\end{theorem}
+
+Regular text here.`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\begin{theorem}'), 'Should preserve LaTeX environment');
+            assert.ok(latexContent.includes('\\end{theorem}'), 'Should preserve LaTeX end');
+        });
+
+        test('should convert blockquotes', async () => {
+            const testFilePath = path.join(testWorkspace, 'blockquotes.md');
+            const content = `# Document with Quotes
+
+> This is a quote.
+> It spans multiple lines.`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\begin{quote}') || latexContent.includes('\\item'), 'Should convert blockquotes');
+        });
+
+        test('should convert horizontal rules', async () => {
+            const testFilePath = path.join(testWorkspace, 'hrules.md');
+            const content = `# Document
+
+Section 1
+
+---
+
+Section 2`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\hrule'), 'Should convert horizontal rules');
+        });
+
+        test('should handle complex documents with mixed content', async () => {
+            const testFilePath = path.join(testWorkspace, 'complex.md');
+            const content = `# Complex Document
+
+## Introduction
+
+This document has **bold** and *italic* text, plus \`inline code\`.
+
+### Table
+
+| Feature | Status |
+|---------|--------|
+| Tables | ✓ |
+| Code | ✓ |
+
+### Code Example
+
+\`\`\`python
+def hello():
+    print("Hello")
+\`\`\`
+
+### Math
+
+The formula is $E = mc^2$.
+
+### Footnote
+
+This has a note[^1].
+
+[^1]: The note text.`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            // Verify all features are present
+            assert.ok(latexContent.includes('\\section{Complex Document}'), 'Should have sections');
+            assert.ok(latexContent.includes('\\textbf{bold}'), 'Should have bold');
+            assert.ok(latexContent.includes('\\textit{italic}'), 'Should have italic');
+            assert.ok(latexContent.includes('\\texttt{inline code}'), 'Should have inline code');
+            assert.ok(latexContent.includes('\\begin{table}'), 'Should have tables');
+            assert.ok(latexContent.includes('\\begin{lstlisting}'), 'Should have code blocks');
+            assert.ok(latexContent.includes('$E = mc^2$'), 'Should have math');
+            assert.ok(latexContent.includes('\\footnote'), 'Should have footnotes');
+        });
+    });
 });
 
