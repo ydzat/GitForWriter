@@ -459,7 +459,7 @@ Regular text here.`;
             const outputPath = await exportManager.export(doc, 'latex');
             const latexContent = fs.readFileSync(outputPath, 'utf-8');
 
-            assert.ok(latexContent.includes('\\begin{quote}') || latexContent.includes('\\item'), 'Should convert blockquotes');
+            assert.ok(latexContent.includes('\\begin{quote}'), 'Should convert blockquotes to quote environment');
         });
 
         test('should convert horizontal rules', async () => {

@@ -46,6 +46,8 @@ export class ExportManager {
         'fsharp': 'ML',
         'rb': 'Ruby',
         'ruby': 'Ruby',
+        // NOTE: 'Go' and 'Rust' are not natively supported by LaTeX listings package.
+        // If you use these languages, you must provide custom language definitions in the template preamble.
         'go': 'Go',
         'rust': 'Rust',
         'php': 'PHP',
@@ -505,8 +507,9 @@ ${content}
      * (e.g., objective-c, c++, c#, f#, x86-64)
      */
     private convertCodeBlocks(markdown: string): string {
-        // Flexible pattern: supports alphanumeric, hyphens, plus, hash in language identifier
-        return markdown.replace(/```([a-zA-Z0-9_+\-#]+)?\s*\n?([\s\S]+?)\n?```/g, (_, lang, code) => {
+        // Strict pattern: requires newlines after opening and before closing backticks
+        // Supports alphanumeric, hyphens, plus, hash in language identifier
+        return markdown.replace(/```([a-zA-Z0-9_+\-#]+)?\n([\s\S]+?)\n```/g, (_, lang, code) => {
             if (lang) {
                 // Use listings package for syntax highlighting
                 return `\\begin{lstlisting}[language=${this.mapLanguage(lang)}]\n${code}\\end{lstlisting}`;
@@ -547,11 +550,13 @@ ${content}
                 // Start of blockquote
                 result.push('\\begin{quote}');
                 inQuote = true;
-                // Convert the quote line (remove '>', content already processed by earlier steps)
-                result.push(trimmedLine.substring(1).trim());
+                // Convert the quote line (remove '>' and escape remaining special chars)
+                // Note: Blockquotes are processed in Step 8, before bold/italic/code/links
+                // Those steps only escape content within their own constructs, not the whole line
+                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
             } else if (isQuoteLine && inQuote) {
-                // Continuation of blockquote (content already processed by earlier steps)
-                result.push(trimmedLine.substring(1).trim());
+                // Continuation of blockquote (escape remaining special chars)
+                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
             } else if (!isQuoteLine && inQuote && trimmedLine !== '') {
                 // End of blockquote (non-empty, non-quote line)
                 result.push('\\end{quote}');
@@ -603,11 +608,16 @@ ${content}
                 result.push(`\\begin{${listType}}`);
                 inList = true;
 
-                // Convert the list item (content already processed by earlier steps - no escaping needed)
+                // Convert the list item (escape remaining special chars)
+                // Note: Lists are processed in Step 14, after bold/italic/code/links
+                // However, those steps only escape content within their own constructs
+                // We still need to escape special chars in the remaining text
                 if (isUnorderedItem) {
-                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 } else {
-                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
+                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 }
             } else if (isListItem && inList) {
                 // Check if list type is changing
@@ -618,11 +628,13 @@ ${content}
                     result.push(`\\begin{${listType}}`);
                 }
 
-                // Convert the list item (content already processed by earlier steps - no escaping needed)
+                // Convert the list item (escape remaining special chars)
                 if (isUnorderedItem) {
-                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 } else {
-                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
+                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
+                    result.push(`\\item ${this.escapeLatex(content)}`);
                 }
             } else if (!isListItem && !isEmptyLine && inList) {
                 // Ending the list

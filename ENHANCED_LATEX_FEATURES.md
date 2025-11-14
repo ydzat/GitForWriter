@@ -39,7 +39,7 @@ The enhanced LaTeX conversion now supports advanced Markdown features including:
    xelatex -no-shell-escape document.tex
    ```
 
-   **This extension should use `-no-shell-escape` by default for all compilations.** Users who need shell-escape for specific use cases can enable it manually in their settings.
+   **Note:** This extension does *not* currently enforce `-no-shell-escape` by default for all compilations. Users should manually ensure this flag is set for secure compilation. Those who need shell-escape for specific use cases can enable it manually in their settings.
 
 3. **Avoid or allow-list safe LaTeX packages**. Dangerous packages include:
    - `shellesc` - Enables shell command execution
