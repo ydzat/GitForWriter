@@ -632,6 +632,42 @@ This has a note[^1].
 
             assert.ok(latexContent.includes('\\textbackslash{}'), 'Should escape backslashes');
         });
+
+        test('should support footnotes with hyphens and underscores in IDs', async () => {
+            const testFilePath = path.join(testWorkspace, 'footnote-ids.md');
+            const content = `Text with footnote[^my-note] and another[^note_1].\n\n[^my-note]: First footnote\n[^note_1]: Second footnote`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            assert.ok(latexContent.includes('\\footnote{First footnote}'), 'Should convert footnote with hyphen');
+            assert.ok(latexContent.includes('\\footnote{Second footnote}'), 'Should convert footnote with underscore');
+        });
+
+        test('should handle switching between list types', async () => {
+            const testFilePath = path.join(testWorkspace, 'mixed-lists.md');
+            const content = `- Unordered item 1\n- Unordered item 2\n1. Ordered item 1\n2. Ordered item 2`;
+            fs.writeFileSync(testFilePath, content);
+
+            const doc = await vscode.workspace.openTextDocument(testFilePath);
+            const outputPath = await exportManager.export(doc, 'latex');
+            const latexContent = fs.readFileSync(outputPath, 'utf-8');
+
+            // Should have both itemize and enumerate environments
+            assert.ok(latexContent.includes('\\begin{itemize}'), 'Should have itemize environment');
+            assert.ok(latexContent.includes('\\end{itemize}'), 'Should close itemize environment');
+            assert.ok(latexContent.includes('\\begin{enumerate}'), 'Should have enumerate environment');
+            assert.ok(latexContent.includes('\\end{enumerate}'), 'Should close enumerate environment');
+
+            // Verify order: itemize should come before enumerate
+            const itemizeStart = latexContent.indexOf('\\begin{itemize}');
+            const itemizeEnd = latexContent.indexOf('\\end{itemize}');
+            const enumerateStart = latexContent.indexOf('\\begin{enumerate}');
+            assert.ok(itemizeStart < itemizeEnd, 'itemize should be properly closed');
+            assert.ok(itemizeEnd < enumerateStart, 'enumerate should start after itemize ends');
+        });
     });
 });
 

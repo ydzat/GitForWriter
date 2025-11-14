@@ -45,11 +45,13 @@ The enhanced LaTeX conversion now supports advanced Markdown features including:
 
 4. **Image Width**: Image width is currently hardcoded to `0.8\textwidth`. This may be made configurable in future versions.
 
-5. **Multi-line Footnotes**: Footnotes support multi-line content when indented with 4 spaces or a tab, but complex formatting within footnotes may not work as expected.
+5. **Multi-line Footnotes**: Footnotes support multi-line content when indented with 4 spaces or a tab. Footnote IDs can contain alphanumeric characters, hyphens, and underscores (e.g., `[^my-note]`, `[^note_1]`).
 
 6. **Bold/Italic in Headings**: Formatting markers within headings are processed, but complex nested formatting may not work as expected.
 
 7. **Citation Format**: Only supports basic `[@ref]` and `[@ref1; @ref2]` citation formats. Advanced citation features may require manual LaTeX editing.
+
+8. **Performance**: For very large documents (e.g., books with hundreds of pages), the conversion process may take longer due to multiple regex passes. For typical literary documents, performance is acceptable.
 
 ## Future Improvements
 

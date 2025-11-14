@@ -291,8 +291,9 @@ ${content}
 
         // Step 3: Convert footnotes
         // Collect footnote definitions (supports multi-line footnotes with indentation)
+        // Supports alphanumeric IDs with hyphens and underscores (e.g., [^my-note], [^note_1])
         const footnotes: Map<string, string> = new Map();
-        latex = latex.replace(/^\[\^(\w+)\]:\s*(.+(?:\n(?:    |\t).+)*)$/gm, (_, id, text) => {
+        latex = latex.replace(/^\[\^([a-zA-Z0-9\-_]+)\]:\s*(.+(?:\n(?:    |\t).+)*)$/gm, (_, id, text) => {
             // Remove indentation from multi-line footnotes
             const cleanedText = text.replace(/\n(?:    |\t)/g, ' ');
             footnotes.set(id, this.escapeLatex(cleanedText));
@@ -300,7 +301,7 @@ ${content}
         });
 
         // Convert footnote references
-        latex = latex.replace(/\[\^(\w+)\]/g, (_, id) => {
+        latex = latex.replace(/\[\^([a-zA-Z0-9\-_]+)\]/g, (_, id) => {
             const text = footnotes.get(id) || '';
             return `\\footnote{${text}}`;
         });
@@ -548,6 +549,7 @@ ${content}
 
     /**
      * Convert both ordered and unordered lists
+     * Handles switching between list types (unordered to ordered or vice versa)
      */
     private convertLists(markdown: string): string {
         const lines = markdown.split('\n');
@@ -565,9 +567,12 @@ ${content}
             const isListItem = isUnorderedItem || isOrderedItem;
             const isEmptyLine = trimmedLine === '';
 
+            // Determine the current item's list type
+            const currentItemType = isOrderedItem ? 'enumerate' : (isUnorderedItem ? 'itemize' : null);
+
             if (isListItem && !inList) {
                 // Starting a new list
-                listType = isOrderedItem ? 'enumerate' : 'itemize';
+                listType = currentItemType;
                 result.push(`\\begin{${listType}}`);
                 inList = true;
 
@@ -578,7 +583,15 @@ ${content}
                     result.push(line.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
                 }
             } else if (isListItem && inList) {
-                // Continue the list
+                // Check if list type is changing
+                if (currentItemType !== listType) {
+                    // Close current list and start new one
+                    result.push(`\\end{${listType}}`);
+                    listType = currentItemType;
+                    result.push(`\\begin{${listType}}`);
+                }
+
+                // Convert the list item
                 if (isUnorderedItem) {
                     result.push(line.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
                 } else {
