@@ -2,10 +2,10 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ExportError } from '../../utils/errorHandler';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface LaTeXCompiler {
     name: string;
@@ -24,10 +24,10 @@ export type TemplateType = 'default' | 'academic' | 'book' | 'article';
 
 export class ExportManager {
     private availableCompilers: LaTeXCompiler[] = [];
+    private compilersDetected: boolean = false;
 
     constructor() {
-        // Detect available compilers on initialization
-        this.detectLaTeXCompilers();
+        // Compiler detection will be done lazily on first use
     }
 
     async export(document: vscode.TextDocument, format: string): Promise<string> {
@@ -161,18 +161,12 @@ ${content}
         const texPath = outputPath.replace('.pdf', '.tex');
         await this.exportLatex(content, texPath, languageId);
 
+        // Detect available compilers (lazy initialization)
+        await this.detectLaTeXCompilers();
+
         // Check if LaTeX compiler is available
         if (this.availableCompilers.length === 0) {
             // No compiler found, show helpful message
-            const message = `PDF export requires LaTeX installation. LaTeX file has been generated at: ${texPath}
-
-To generate PDF, please install LaTeX:
-- Windows: MiKTeX (https://miktex.org/)
-- macOS: MacTeX (https://www.tug.org/mactex/)
-- Linux: TeX Live (sudo apt-get install texlive-full)
-
-Or use online tools like Overleaf.`;
-
             const selection = await vscode.window.showWarningMessage(
                 'LaTeX not found. Install LaTeX to enable PDF export.',
                 'Open LaTeX File',
@@ -251,20 +245,22 @@ Or use online tools like Overleaf.`;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            const isListItem = line.trim().startsWith('\\item');
+            const trimmedLine = line.trim();
+            const isListItem = trimmedLine.startsWith('\\item');
+            const isEmptyLine = trimmedLine === '';
 
             if (isListItem && !inList) {
                 // Starting a new list
                 result.push('\\begin{itemize}');
                 inList = true;
                 result.push(line);
-            } else if (!isListItem && inList) {
-                // Ending the list before adding non-list line
+            } else if (!isListItem && !isEmptyLine && inList) {
+                // Ending the list before adding non-list, non-empty line
                 result.push('\\end{itemize}');
                 inList = false;
                 result.push(line);
             } else {
-                // Continue in current state
+                // Continue in current state (including empty lines within lists)
                 result.push(line);
             }
         }
@@ -279,8 +275,14 @@ Or use online tools like Overleaf.`;
 
     /**
      * Detect available LaTeX compilers in system PATH
+     * Only runs once, subsequent calls return immediately
      */
     private async detectLaTeXCompilers(): Promise<void> {
+        // Skip if already detected
+        if (this.compilersDetected) {
+            return;
+        }
+
         const compilers = [
             { name: 'pdflatex', command: 'pdflatex' },
             { name: 'xelatex', command: 'xelatex' },
@@ -292,7 +294,7 @@ Or use online tools like Overleaf.`;
         for (const compiler of compilers) {
             try {
                 // Check if compiler is available by running --version
-                const { stdout } = await execAsync(`${compiler.command} --version`);
+                const { stdout } = await execFileAsync(compiler.command, ['--version']);
                 if (stdout) {
                     this.availableCompilers.push({
                         name: compiler.name,
@@ -304,6 +306,8 @@ Or use online tools like Overleaf.`;
                 // Compiler not found, skip
             }
         }
+
+        this.compilersDetected = true;
     }
 
     /**
@@ -345,26 +349,45 @@ Or use online tools like Overleaf.`;
             },
             async (progress, token) => {
                 try {
+                    // Calculate progress increments to always total 100%
+                    let firstPassIncrement, secondPassIncrement, finalPassIncrement, cleanIncrement, doneIncrement;
+
+                    if (options.multiPass) {
+                        // Three compilation passes
+                        firstPassIncrement = 25;
+                        secondPassIncrement = 25;
+                        finalPassIncrement = 25;
+                        cleanIncrement = options.cleanAuxFiles ? 15 : 0;
+                        doneIncrement = 10;
+                    } else {
+                        // Single compilation pass
+                        firstPassIncrement = options.cleanAuxFiles ? 70 : 85;
+                        secondPassIncrement = 0;
+                        finalPassIncrement = 0;
+                        cleanIncrement = options.cleanAuxFiles ? 15 : 0;
+                        doneIncrement = 15;
+                    }
+
                     // First pass
-                    progress.report({ message: 'Running first pass...', increment: 25 });
+                    progress.report({ message: 'Running first pass...', increment: firstPassIncrement });
                     await this.runLatexCompiler(compiler.command, texFileName, workDir, token);
 
                     // Multi-pass compilation for references
                     if (options.multiPass) {
-                        progress.report({ message: 'Running second pass...', increment: 25 });
+                        progress.report({ message: 'Running second pass...', increment: secondPassIncrement });
                         await this.runLatexCompiler(compiler.command, texFileName, workDir, token);
 
-                        progress.report({ message: 'Running final pass...', increment: 25 });
+                        progress.report({ message: 'Running final pass...', increment: finalPassIncrement });
                         await this.runLatexCompiler(compiler.command, texFileName, workDir, token);
                     }
 
                     // Clean auxiliary files
                     if (options.cleanAuxFiles) {
-                        progress.report({ message: 'Cleaning auxiliary files...', increment: 15 });
+                        progress.report({ message: 'Cleaning auxiliary files...', increment: cleanIncrement });
                         await this.cleanAuxiliaryFiles(workDir, path.basename(texPath, '.tex'));
                     }
 
-                    progress.report({ message: 'Done!', increment: 10 });
+                    progress.report({ message: 'Done!', increment: doneIncrement });
 
                     // Check if PDF was created
                     const generatedPdfPath = path.join(workDir, path.basename(texPath, '.tex') + '.pdf');
@@ -377,7 +400,9 @@ Or use online tools like Overleaf.`;
 
                     // Move PDF to desired location if different
                     if (generatedPdfPath !== pdfPath) {
-                        fs.renameSync(generatedPdfPath, pdfPath);
+                        // Use copy + unlink instead of rename for better cross-platform compatibility
+                        fs.copyFileSync(generatedPdfPath, pdfPath);
+                        fs.unlinkSync(generatedPdfPath);
                     }
 
                     // Open PDF after compilation
@@ -413,16 +438,23 @@ Or use online tools like Overleaf.`;
             // Run compiler with options:
             // -interaction=nonstopmode: don't stop on errors, continue to get full error log
             // -file-line-error: show file and line number in errors
-            const command = `${compiler} -interaction=nonstopmode -file-line-error "${texFileName}"`;
+            const args = ['-interaction=nonstopmode', '-file-line-error', texFileName];
 
-            const { stdout, stderr } = await execAsync(command, {
+            const { stderr } = await execFileAsync(compiler, args, {
                 cwd: workDir,
                 timeout: 60000 // 60 second timeout
             });
 
-            // Check for errors in output
-            if (stderr && stderr.includes('Error')) {
-                throw new Error(stderr);
+            // Check for errors in output (case-insensitive, and LaTeX error indicators)
+            if (stderr) {
+                const errorLines = stderr.split('\n');
+                const hasLatexError = errorLines.some(line =>
+                    line.trim().startsWith('!') ||
+                    /error/i.test(line)
+                );
+                if (hasLatexError) {
+                    throw new Error(stderr);
+                }
             }
         } catch (error: any) {
             // Parse LaTeX error messages

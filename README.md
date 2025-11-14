@@ -291,7 +291,8 @@ Unified Provider 通过 Vercel AI SDK 提供对多个 LLM 提供商的统一访�
   "gitforwriter.latex.compiler": "pdflatex",       // 编译器: pdflatex/xelatex/lualatex
   "gitforwriter.latex.multiPass": true,            // 多次编译以解析引用
   "gitforwriter.latex.cleanAuxFiles": true,        // 编译后清理辅助文件
-  "gitforwriter.latex.openAfterCompile": true      // 编译完成后自动打开 PDF
+  "gitforwriter.latex.openAfterCompile": true,     // 编译完成后自动打开 PDF
+  "gitforwriter.latex.author": "Your Name"         // 可选: 作者名 (默认为 'Author')
 }
 ```
 

@@ -241,7 +241,7 @@ Test content
         const content = fs.readFileSync(outputPath, 'utf-8');
 
         // Academic template should have specific packages
-        assert.ok(content.includes('\\usepackage{amsmath'), 'Should include amsmath package');
+        assert.ok(content.includes('\\usepackage{amsmath,amssymb,amsthm}'), 'Should include amsmath, amssymb, and amsthm packages');
         assert.ok(content.includes('\\usepackage{cite}'), 'Should include cite package');
         assert.ok(content.includes('\\begin{abstract}'), 'Should have abstract environment');
 

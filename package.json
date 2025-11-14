@@ -203,8 +203,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/copy-templates.js",
     "watch": "tsc -watch -p ./",
+    "copy-templates": "node scripts/copy-templates.js",
     "clean": "rimraf out",
     "lint": "eslint src --ext ts",
     "pretest": "npm run compile",
