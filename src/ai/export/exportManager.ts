@@ -391,8 +391,8 @@ ${content}
         // Step 12: Convert inline code (escape special chars in code)
         latex = latex.replace(/`(.+?)`/g, (_, code) => `\\texttt{${this.escapeLatex(code)}}`);
 
-        // Step 13: Convert links (escape link text)
-        latex = latex.replace(/\[(.+?)\]\((.+?)\)/g, (_, text, url) => `\\href{${url}}{${this.escapeLatex(text)}}`);
+        // Step 13: Convert links (escape link text, avoid nested brackets)
+        latex = latex.replace(/\[([^\[\]]+)\]\(([^)]+)\)/g, (_, text, url) => `\\href{${url}}{${this.escapeLatex(text)}}`);
 
 
         // Step 14: Convert lists (both unordered and ordered)
@@ -466,19 +466,20 @@ ${content}
      * Convert a single Markdown table to LaTeX tabular
      */
     private convertTableToLatex(tableLines: string[], separatorLine: string): string {
-        // Parse header (with escaping)
-        const header = tableLines[0].split('|').map(cell => this.escapeLatex(cell.trim())).filter(cell => cell);
+        // Parse header (with escaping, preserve empty cells)
+        // Use slice(1, -1) to remove leading/trailing empty elements from pipes
+        const header = tableLines[0].split('|').map(cell => this.escapeLatex(cell.trim())).slice(1, -1);
 
         // Parse alignment from separator line
-        const alignments = separatorLine.split('|').map(cell => cell.trim()).filter(cell => cell).map(sep => {
+        const alignments = separatorLine.split('|').map(cell => cell.trim()).slice(1, -1).map(sep => {
             if (sep.startsWith(':') && sep.endsWith(':')) return 'c';
             if (sep.endsWith(':')) return 'r';
             return 'l';
         });
 
-        // Parse data rows (with escaping)
+        // Parse data rows (with escaping, preserve empty cells)
         const dataRows = tableLines.slice(1).map(line =>
-            line.split('|').map(cell => this.escapeLatex(cell.trim())).filter(cell => cell)
+            line.split('|').map(cell => this.escapeLatex(cell.trim())).slice(1, -1)
         );
 
         // Build LaTeX table
@@ -546,11 +547,11 @@ ${content}
                 // Start of blockquote
                 result.push('\\begin{quote}');
                 inQuote = true;
-                // Convert the quote line (remove '>' and escape content)
-                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
+                // Convert the quote line (remove '>', content already processed by earlier steps)
+                result.push(trimmedLine.substring(1).trim());
             } else if (isQuoteLine && inQuote) {
-                // Continuation of blockquote (escape content)
-                result.push(this.escapeLatex(trimmedLine.substring(1).trim()));
+                // Continuation of blockquote (content already processed by earlier steps)
+                result.push(trimmedLine.substring(1).trim());
             } else if (!isQuoteLine && inQuote && trimmedLine !== '') {
                 // End of blockquote (non-empty, non-quote line)
                 result.push('\\end{quote}');
@@ -602,13 +603,11 @@ ${content}
                 result.push(`\\begin{${listType}}`);
                 inList = true;
 
-                // Convert the list item (use trimmedLine for consistent matching, escape content)
+                // Convert the list item (content already processed by earlier steps - no escaping needed)
                 if (isUnorderedItem) {
-                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
                 } else {
-                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
                 }
             } else if (isListItem && inList) {
                 // Check if list type is changing
@@ -619,13 +618,11 @@ ${content}
                     result.push(`\\begin{${listType}}`);
                 }
 
-                // Convert the list item (use trimmedLine for consistent matching, escape content)
+                // Convert the list item (content already processed by earlier steps - no escaping needed)
                 if (isUnorderedItem) {
-                    const content = trimmedLine.replace(/^([\*\-])\s+(.+)$/, '$2');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(trimmedLine.replace(/^([\*\-])\s+(.+)$/, '\\item $2'));
                 } else {
-                    const content = trimmedLine.replace(/^\d+\.\s+(.+)$/, '$1');
-                    result.push(`\\item ${this.escapeLatex(content)}`);
+                    result.push(trimmedLine.replace(/^\d+\.\s+(.+)$/, '\\item $1'));
                 }
             } else if (!isListItem && !isEmptyLine && inList) {
                 // Ending the list

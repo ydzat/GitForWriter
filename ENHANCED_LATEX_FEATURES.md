@@ -39,6 +39,8 @@ The enhanced LaTeX conversion now supports advanced Markdown features including:
    xelatex -no-shell-escape document.tex
    ```
 
+   **This extension should use `-no-shell-escape` by default for all compilations.** Users who need shell-escape for specific use cases can enable it manually in their settings.
+
 3. **Avoid or allow-list safe LaTeX packages**. Dangerous packages include:
    - `shellesc` - Enables shell command execution
    - `write18` - Allows writing to arbitrary files
@@ -58,8 +60,8 @@ function sanitizeLatex(latexStr: string): string {
     // Block dangerous commands
     const forbidden = [
         /\\write18/,
-        /\\input/,
-        /\\include/,
+        /\\input/,        // Note: \input and \include are commonly needed for legitimate documents
+        /\\include/,      // Consider using a whitelist approach or restricting to safe directories
         /\\openout/,
         /\\read/,
         /\\usepackage\{shellesc\}/
@@ -73,6 +75,11 @@ function sanitizeLatex(latexStr: string): string {
     return latexStr;
 }
 ```
+
+> **Note**: The above example blocks `\input` and `\include` commands completely, but these are commonly needed for legitimate LaTeX documents (e.g., including bibliography files, splitting large documents into chapters). For production use, consider a more nuanced approach such as:
+> - Restricting file paths to a safe directory
+> - Using a whitelist of allowed files
+> - Validating file paths to prevent directory traversal attacks
 
 ## Known Limitations
 
@@ -177,6 +184,8 @@ function hello() {
 - Ruby, Go, Rust, PHP
 - SQL, Bash
 - HTML, XML, JSON, YAML
+
+> **Note**: The LaTeX `listings` package does not natively support Go or Rust. To use syntax highlighting for these languages, you must provide custom language definitions in your LaTeX preamble. Otherwise, compilation may fail or produce incorrect output for Go and Rust code blocks. See the [listings package documentation](https://ctan.org/pkg/listings) for details on defining custom languages.
 
 ### 3. Images
 
