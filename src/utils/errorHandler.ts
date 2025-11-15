@@ -281,20 +281,78 @@ export class ErrorLogger {
     }
 
     /**
+     * Sanitize sensitive data from strings
+     * Masks API keys and other sensitive information
+     * Includes protection against circular references and deep nesting
+     * Note: Shared object references are marked as [Already Processed] to avoid duplication in logs
+     */
+    private sanitizeSensitiveData(data: any, depth: number = 0, visited: WeakSet<any> = new WeakSet()): any {
+        // Prevent stack overflow on deeply nested objects
+        if (depth > 10) {
+            return '[Max Depth Exceeded]';
+        }
+
+        if (typeof data === 'string') {
+            // Mask OpenAI API keys (sk-...)
+            data = data.replace(/sk-[a-zA-Z0-9]{20,}/g, 'sk-***REDACTED***');
+            // Mask Claude API keys (sk-ant-...)
+            data = data.replace(/sk-ant-[a-zA-Z0-9_-]{20,}/g, 'sk-ant-***REDACTED***');
+            // Mask generic API keys in various formats
+            data = data.replace(/\bapi[_-]?key\s*[:=]\s*["']?([a-zA-Z0-9_]{20,})\b/g, 'api_key=***REDACTED***');
+            data = data.replace(/\bapi[_-]?key\s*["']\s*[:=]\s*([a-zA-Z0-9_]{20,})\b/g, 'api_key=***REDACTED***');
+            data = data.replace(/\bapi[_-]?key\s*["']?\s*([a-zA-Z0-9_]{20,})\b/g, 'api_key=***REDACTED***');
+            // Mask bearer tokens
+            data = data.replace(/bearer\s+[a-zA-Z0-9_-]{20,}/gi, 'bearer ***REDACTED***');
+            return data;
+        } else if (Array.isArray(data)) {
+            // Check for already processed reference (circular or shared)
+            if (visited.has(data)) {
+                return '[Already Processed]';
+            }
+            visited.add(data);
+            return data.map(item => this.sanitizeSensitiveData(item, depth + 1, visited));
+        } else if (typeof data === 'object' && data !== null) {
+            // Check for already processed reference (circular or shared)
+            if (visited.has(data)) {
+                return '[Already Processed]';
+            }
+            visited.add(data);
+
+            const sanitized: any = {};
+            for (const key in data) {
+                // Skip sensitive keys entirely
+                if (/api[_-]?key|secret|password|token|authorization/i.test(key)) {
+                    sanitized[key] = '***REDACTED***';
+                } else {
+                    sanitized[key] = this.sanitizeSensitiveData(data[key], depth + 1, visited);
+                }
+            }
+            return sanitized;
+        }
+        return data;
+    }
+
+    /**
      * Log an error
      */
     log(error: Error | GitForWriterError, context?: Record<string, any>): void {
         this.rotateLogsIfNeeded();
 
         const timestamp = new Date().toISOString();
+
+        // Sanitize error message and stack trace
+        const sanitizedMessage = this.sanitizeSensitiveData(error.message);
+        const sanitizedStack = this.sanitizeSensitiveData(error.stack);
+        const sanitizedContext = this.sanitizeSensitiveData(context || (error as GitForWriterError).context);
+
         const logEntry = {
             timestamp,
             name: error.name,
-            message: error.message,
+            message: sanitizedMessage,
             code: (error as GitForWriterError).code,
             severity: (error as GitForWriterError).severity,
-            stack: error.stack,
-            context: context || (error as GitForWriterError).context
+            stack: sanitizedStack,
+            context: sanitizedContext
         };
 
         const logLine = JSON.stringify(logEntry) + '\n';
