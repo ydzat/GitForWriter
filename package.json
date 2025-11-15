@@ -63,6 +63,18 @@
       {
         "command": "gitforwriter.clearAPIKeys",
         "title": "GitForWriter: Clear API Keys"
+      },
+      {
+        "command": "gitforwriter.viewStatistics",
+        "title": "GitForWriter: View Statistics"
+      },
+      {
+        "command": "gitforwriter.enableStatistics",
+        "title": "GitForWriter: Enable Statistics"
+      },
+      {
+        "command": "gitforwriter.disableStatistics",
+        "title": "GitForWriter: Disable Statistics"
       }
     ],
     "configuration": {
@@ -204,6 +216,11 @@
           "minimum": 10000,
           "maximum": 600000,
           "description": "Timeout for LaTeX compilation in milliseconds (10-600 seconds)"
+        },
+        "gitforwriter.statistics.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable writing statistics collection (opt-in, all data stored locally)"
         }
       }
     }

@@ -5,11 +5,13 @@ import * as dotenv from 'dotenv';
 import { GitManager } from './utils/gitManager';
 import { StatusBarManager } from './utils/statusBarManager';
 import { AIReviewPanel } from './webview/aiReviewPanel';
+import { StatsPanel } from './webview/statsPanel';
 import { DiffAnalyzer } from './ai/diff/diffAnalyzer';
 import { ReviewEngine } from './ai/review/reviewEngine';
 import { ExportManager } from './ai/export/exportManager';
 import { SecretManager } from './config/secretManager';
 import { ConfigManager } from './config/configManager';
+import { StatsCollector } from './analytics/statsCollector';
 import { errorHandler } from './utils/errorHandlerUI';
 import { GitError } from './utils/errorHandler';
 
@@ -33,6 +35,12 @@ export async function activate(context: vscode.ExtensionContext) {
     const diffAnalyzer = new DiffAnalyzer(configManager, secretManager);
     const reviewEngine = new ReviewEngine(configManager, secretManager);
     const exportManager = new ExportManager();
+
+    // Initialize StatsCollector
+    let statsCollector: StatsCollector | undefined;
+    if (workspaceFolder) {
+        statsCollector = new StatsCollector(workspaceFolder.uri.fsPath);
+    }
 
     // Initialize error handler
     if (workspaceFolder) {
@@ -87,9 +95,32 @@ export async function activate(context: vscode.ExtensionContext) {
         await clearAPIKeys(secretManager);
     });
 
+    // Statistics commands
+    const viewStatsCommand = vscode.commands.registerCommand('gitforwriter.viewStatistics', async () => {
+        if (statsCollector) {
+            StatsPanel.createOrShow(statsCollector);
+        } else {
+            vscode.window.showErrorMessage('No workspace folder open');
+        }
+    });
+
+    const enableStatsCommand = vscode.commands.registerCommand('gitforwriter.enableStatistics', async () => {
+        if (statsCollector) {
+            statsCollector.enable();
+            vscode.window.showInformationMessage('Writing statistics enabled');
+        }
+    });
+
+    const disableStatsCommand = vscode.commands.registerCommand('gitforwriter.disableStatistics', async () => {
+        if (statsCollector) {
+            statsCollector.disable();
+            vscode.window.showInformationMessage('Writing statistics disabled');
+        }
+    });
+
     // Register document save handler
     const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
-        await handleDocumentSave(document, gitManager, diffAnalyzer);
+        await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector);
     });
 
     context.subscriptions.push(
@@ -100,6 +131,9 @@ export async function activate(context: vscode.ExtensionContext) {
         setOpenAIKeyCommand,
         setClaudeKeyCommand,
         clearKeysCommand,
+        viewStatsCommand,
+        enableStatsCommand,
+        disableStatsCommand,
         saveHandler,
         statusBarManager
     );
@@ -215,7 +249,8 @@ async function exportDraft(exportManager: ExportManager) {
 async function handleDocumentSave(
     document: vscode.TextDocument,
     gitManager: GitManager,
-    diffAnalyzer: DiffAnalyzer
+    diffAnalyzer: DiffAnalyzer,
+    statsCollector?: StatsCollector
 ) {
     // Only process Markdown and LaTeX files
     if (!['markdown', 'latex'].includes(document.languageId)) {
@@ -230,6 +265,18 @@ async function handleDocumentSave(
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         return;
+    }
+
+    // Collect writing statistics
+    if (statsCollector && statsCollector.isEnabled()) {
+        const text = document.getText();
+        const wordCount = StatsCollector.countWords(text);
+
+        // Get previous word count from document metadata (if available)
+        const previousWordCount = (document as any)._previousWordCount || 0;
+        (document as any)._previousWordCount = wordCount;
+
+        statsCollector.recordWordsWritten(document.fileName, wordCount, previousWordCount);
     }
 
     try {
