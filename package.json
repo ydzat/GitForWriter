@@ -252,7 +252,7 @@
     "dotenv": "^17.2.3",
     "openai": "^6.8.1",
     "simple-git": "^3.19.0",
-    "uuid": "^13.0.0"
+    "uuid": "^9.0.1"
   },
   "license": "MIT"
 }
