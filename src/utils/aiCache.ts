@@ -24,7 +24,8 @@ export interface CacheConfig {
  */
 export class AICache<T> {
     private cache: Map<string, CacheEntry<T>>;
-    private accessOrder: string[]; // Track access order for LRU
+    private accessOrder: Map<string, number>; // Track access order for LRU (key -> timestamp)
+    private accessCounter: number; // Monotonically increasing counter for access order
     private currentSize: number; // Current cache size in bytes
     private config: CacheConfig;
     private hits: number;
@@ -32,7 +33,8 @@ export class AICache<T> {
 
     constructor(config?: Partial<CacheConfig>) {
         this.cache = new Map();
-        this.accessOrder = [];
+        this.accessOrder = new Map();
+        this.accessCounter = 0;
         this.currentSize = 0;
         this.hits = 0;
         this.misses = 0;
@@ -77,29 +79,37 @@ export class AICache<T> {
      * Evict least recently used entries until size is under limit
      */
     private evictLRU(): void {
-        while (this.currentSize > this.config.maxSize && this.accessOrder.length > 0) {
-            const oldestKey = this.accessOrder.shift();
+        while (this.currentSize > this.config.maxSize && this.accessOrder.size > 0) {
+            // Find the key with the smallest access counter (least recently used)
+            let oldestKey: string | null = null;
+            let oldestCounter = Infinity;
+
+            for (const [key, counter] of this.accessOrder.entries()) {
+                if (counter < oldestCounter) {
+                    oldestCounter = counter;
+                    oldestKey = key;
+                }
+            }
+
             if (oldestKey) {
                 const entry = this.cache.get(oldestKey);
                 if (entry) {
                     this.currentSize -= entry.size;
                     this.cache.delete(oldestKey);
+                    this.accessOrder.delete(oldestKey);
                 }
+            } else {
+                break; // No more entries to evict
             }
         }
     }
 
     /**
      * Update access order for LRU
+     * Uses a Map with monotonic counter for O(1) updates
      */
     private updateAccessOrder(key: string): void {
-        // Remove key from current position
-        const index = this.accessOrder.indexOf(key);
-        if (index > -1) {
-            this.accessOrder.splice(index, 1);
-        }
-        // Add to end (most recently used)
-        this.accessOrder.push(key);
+        this.accessOrder.set(key, this.accessCounter++);
     }
 
     /**
@@ -122,10 +132,7 @@ export class AICache<T> {
         if (this.isExpired(entry)) {
             this.cache.delete(key);
             this.currentSize -= entry.size;
-            const index = this.accessOrder.indexOf(key);
-            if (index > -1) {
-                this.accessOrder.splice(index, 1);
-            }
+            this.accessOrder.delete(key);
             this.misses++;
             return null;
         }
@@ -173,7 +180,8 @@ export class AICache<T> {
      */
     clear(): void {
         this.cache.clear();
-        this.accessOrder = [];
+        this.accessOrder.clear();
+        this.accessCounter = 0;
         this.currentSize = 0;
         this.hits = 0;
         this.misses = 0;
@@ -241,10 +249,7 @@ export class AICache<T> {
             if (entry) {
                 this.currentSize -= entry.size;
                 this.cache.delete(key);
-                const index = this.accessOrder.indexOf(key);
-                if (index > -1) {
-                    this.accessOrder.splice(index, 1);
-                }
+                this.accessOrder.delete(key);
                 cleaned++;
             }
         }

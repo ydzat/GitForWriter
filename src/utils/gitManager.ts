@@ -52,7 +52,7 @@ export class GitManager {
 
             if (!diff) {
                 // File might be new, check if it's staged
-                // Note: No need to cache status here since the entire diff result is cached
+                // Note: Status check is not cached separately, but the entire diff result (including this check) is cached
                 const status = await this.git.status();
                 const isNew = status.not_added.includes(relativePath) ||
                              status.created.includes(relativePath);

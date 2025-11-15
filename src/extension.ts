@@ -36,8 +36,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const statusBarManager = new StatusBarManager();
     const secretManager = new SecretManager(context.secrets);
     const configManager = new ConfigManager();
-    const diffAnalyzer = new DiffAnalyzer(configManager, secretManager);
-    const reviewEngine = new ReviewEngine(configManager, secretManager);
+    const diffAnalyzer = new DiffAnalyzer(configManager, secretManager, outputChannel);
+    const reviewEngine = new ReviewEngine(configManager, secretManager, outputChannel);
     const exportManager = new ExportManager();
     const performanceMonitor = new PerformanceMonitor(1000, outputChannel); // 1s threshold
 
@@ -177,12 +177,17 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // Register document save handler with debouncing
-    const saveHandler = vscode.workspace.onDidSaveTextDocument((document) => {
+    const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
         // Show analyzing indicator until analysis completes
         const statusBarDisposable = vscode.window.setStatusBarMessage('$(sync~spin) Analyzing changes...');
-        Promise.resolve(debouncedHandleDocumentSave(document)).finally(() => {
+        try {
+            await debouncedHandleDocumentSave(document);
+        } catch (err) {
+            // Error handling is done inside handleDocumentSave
+            // This catch prevents unhandled promise rejections
+        } finally {
             statusBarDisposable.dispose();
-        });
+        }
     });
 
     context.subscriptions.push(
@@ -258,21 +263,20 @@ async function performAIReview(
     reviewEngine: ReviewEngine,
     performanceMonitor: PerformanceMonitor
 ) {
-    const endTiming = performanceMonitor.start('ai-review');
-
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         vscode.window.showErrorMessage('No active editor');
-        endTiming();
         return;
     }
 
     const document = editor.document;
     if (!['markdown', 'latex'].includes(document.languageId)) {
         vscode.window.showErrorMessage('AI Review only supports Markdown and LaTeX files');
-        endTiming();
         return;
     }
+
+    // Start performance monitoring after validation
+    const endTiming = performanceMonitor.start('ai-review');
 
     try {
         vscode.window.showInformationMessage('🔍 Analyzing changes...');
@@ -341,7 +345,6 @@ async function handleDocumentSave(
     previousWordCounts: Map<string, number>,
     performanceMonitor: PerformanceMonitor
 ) {
-    const endTiming = performanceMonitor.start('document-save');
     // Only process Markdown and LaTeX files
     if (!['markdown', 'latex'].includes(document.languageId)) {
         return;
@@ -356,6 +359,9 @@ async function handleDocumentSave(
     if (!workspaceFolder) {
         return;
     }
+
+    // Start performance monitoring after validation
+    const endTiming = performanceMonitor.start('document-save');
 
     // Collect writing statistics
     if (statsCollector && statsCollector.isEnabled()) {
@@ -392,7 +398,7 @@ async function handleDocumentSave(
 
         fs.writeFileSync(diffPath, diff);
 
-        // Quick analysis with performance monitoring
+        // Quick analysis
         const endAnalysisTiming = performanceMonitor.start('diff-analysis');
         const analysis = await diffAnalyzer.quickAnalyze(diff);
         endAnalysisTiming();

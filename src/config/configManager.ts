@@ -39,6 +39,21 @@ export class ConfigManager {
     }
 
     /**
+     * Get performance configuration from VSCode settings
+     * @returns Performance configuration
+     */
+    getPerformanceConfig() {
+        const config = vscode.workspace.getConfiguration(ConfigManager.CONFIG_SECTION);
+
+        return {
+            debounceDelay: config.get<number>('performance.debounceDelay', 2000),
+            enableCache: config.get<boolean>('performance.enableCache', true),
+            cacheTTL: config.get<number>('performance.cacheTTL', 3600000),
+            cacheMaxSize: config.get<number>('performance.cacheMaxSize', 104857600)
+        };
+    }
+
+    /**
      * Set the AI provider
      * @param provider The AI provider to use
      */

@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { DiffAnalysis } from '../diff/diffAnalyzer';
 import { AIProvider, ReviewContext, TextReview, Suggestion } from '../providers/aiProvider';
 import { ConfigManager } from '../../config/configManager';
@@ -35,7 +36,8 @@ export class ReviewEngine {
 
     constructor(
         private configManager: ConfigManager,
-        private secretManager: SecretManager
+        private secretManager: SecretManager,
+        private outputChannel?: vscode.OutputChannel
     ) {
         // Initialize provider asynchronously
         this.initializationPromise = this.initializeProvider();
@@ -46,7 +48,7 @@ export class ReviewEngine {
      */
     private async initializeProvider(): Promise<void> {
         try {
-            this.aiProvider = await initializeAIProvider(this.configManager, this.secretManager);
+            this.aiProvider = await initializeAIProvider(this.configManager, this.secretManager, this.outputChannel);
         } catch (error: any) {
             // Failed to initialize AI provider, will use fallback review
             // Log the error silently without showing UI notification

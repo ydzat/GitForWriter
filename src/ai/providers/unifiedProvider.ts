@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
+import * as vscode from 'vscode';
 import {
     AIProvider,
     AIResponse,
@@ -30,6 +31,7 @@ export interface UnifiedProviderConfig {
     enableCache?: boolean; // Enable AI response caching
     cacheTTL?: number; // Cache TTL in milliseconds
     cacheMaxSize?: number; // Max cache size in bytes
+    outputChannel?: vscode.OutputChannel; // For logging
 }
 
 /**
@@ -45,6 +47,7 @@ export class UnifiedProvider implements AIProvider {
     private diffCache: AICache<DiffAnalysis>;
     private reviewCache: AICache<TextReview>;
     private suggestionsCache: AICache<Suggestion[]>;
+    private outputChannel: vscode.OutputChannel | null;
 
     constructor(config: UnifiedProviderConfig) {
         if (!config.apiKey || config.apiKey.trim() === '') {
@@ -54,6 +57,7 @@ export class UnifiedProvider implements AIProvider {
         this.modelName = config.model;
         this.maxRetries = config.maxRetries ?? 3;
         this.timeout = config.timeout ?? 60000; // Default 60 seconds
+        this.outputChannel = config.outputChannel || null;
 
         // Initialize caches
         const cacheConfig = {
@@ -100,10 +104,14 @@ export class UnifiedProvider implements AIProvider {
 
     /**
      * Generate cache key from content and metadata
-     * Uses JSON.stringify to prevent key collisions
+     * Combines content with stringified metadata to prevent key collisions
+     * The AICache will hash this combined string with SHA-256
      */
     private generateCacheKey(content: string, metadata: any): string {
-        return JSON.stringify({ content, metadata: metadata || {} });
+        // Combine content with metadata separator to avoid collisions
+        // AICache.generateKey will hash this entire string
+        const metadataStr = metadata ? JSON.stringify(metadata) : '';
+        return `${content}\n---METADATA---\n${metadataStr}`;
     }
 
     /**
@@ -141,7 +149,9 @@ export class UnifiedProvider implements AIProvider {
         const cacheKey = this.generateCacheKey(diff, context);
         const cached = this.diffCache.get(cacheKey, 'diff-analysis');
         if (cached) {
-            console.log('✅ Cache hit for diff analysis');
+            if (this.outputChannel) {
+                this.outputChannel.appendLine('✅ Cache hit for diff analysis');
+            }
             return {
                 data: cached,
                 tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedCost: 0 },
@@ -178,7 +188,9 @@ export class UnifiedProvider implements AIProvider {
         const cacheKey = this.generateCacheKey(text, context);
         const cached = this.reviewCache.get(cacheKey, 'text-review');
         if (cached) {
-            console.log('✅ Cache hit for text review');
+            if (this.outputChannel) {
+                this.outputChannel.appendLine('✅ Cache hit for text review');
+            }
             return {
                 data: cached,
                 tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedCost: 0 },
@@ -215,7 +227,9 @@ export class UnifiedProvider implements AIProvider {
         const cacheKey = this.generateCacheKey(text, issues);
         const cached = this.suggestionsCache.get(cacheKey, 'generate-suggestions');
         if (cached) {
-            console.log('✅ Cache hit for suggestions');
+            if (this.outputChannel) {
+                this.outputChannel.appendLine('✅ Cache hit for suggestions');
+            }
             return {
                 data: cached,
                 tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedCost: 0 },

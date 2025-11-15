@@ -235,21 +235,21 @@
         "gitforwriter.performance.enableCache": {
           "type": "boolean",
           "default": true,
-          "description": "Enable AI response caching to reduce API calls and costs"
+          "description": "Enable AI response caching to reduce API calls and costs (only for unified provider)"
         },
         "gitforwriter.performance.cacheTTL": {
           "type": "number",
           "default": 3600000,
-          "minimum": 60000,
+          "minimum": 1000,
           "maximum": 86400000,
-          "description": "Cache time-to-live in milliseconds (1 minute - 24 hours)"
+          "description": "Cache time-to-live in milliseconds (1 second - 24 hours, only for unified provider)"
         },
         "gitforwriter.performance.cacheMaxSize": {
           "type": "number",
           "default": 104857600,
           "minimum": 10485760,
           "maximum": 524288000,
-          "description": "Maximum cache size in bytes (10MB - 500MB)"
+          "description": "Maximum cache size in bytes (10MB - 500MB, only for unified provider)"
         }
       }
     }

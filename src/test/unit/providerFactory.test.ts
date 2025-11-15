@@ -14,6 +14,12 @@ describe('ProviderFactory Unit Tests', () => {
                 openai: { model: 'gpt-4', baseURL: undefined },
                 claude: { model: 'claude-3-sonnet' },
                 unified: { provider: 'openai', model: 'gpt-4', baseURL: undefined }
+            }),
+            getPerformanceConfig: () => ({
+                debounceDelay: 2000,
+                enableCache: true,
+                cacheTTL: 3600000,
+                cacheMaxSize: 104857600
             })
         };
 

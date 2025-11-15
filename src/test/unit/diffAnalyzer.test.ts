@@ -16,6 +16,12 @@ describe('DiffAnalyzer Unit Tests', () => {
                 openai: { model: 'gpt-4' },
                 claude: { model: 'claude-3-sonnet' },
                 local: { endpoint: 'http://localhost:11434', model: 'llama2' }
+            }),
+            getPerformanceConfig: () => ({
+                debounceDelay: 2000,
+                enableCache: true,
+                cacheTTL: 3600000,
+                cacheMaxSize: 104857600
             })
         } as any;
 
