@@ -46,6 +46,22 @@ GitForWriter 是一个 VSCode 插件，旨在探索 AI 与版本控制在创作�
   - 编译完成后自动打开 PDF
   - 友好的错误提示和解决建议
 
+### 6. 性能优化 ⚡
+- **AI 响应缓存**：智能缓存 AI 分析结果，减少重复 API 调用
+  - LRU 缓存策略，自动管理内存使用
+  - 可配置的缓存大小和过期时间
+  - 显著降低 API 成本和响应时间
+- **文档保存防抖**：避免频繁保存时的重复分析
+  - 可配置的延迟时间（默认 2 秒）
+  - 智能合并连续的保存操作
+- **Git 操作优化**：缓存 Git 状态和 diff 结果
+  - 减少磁盘 I/O 操作
+  - 提升大型项目的响应速度
+- **性能监控**：实时追踪操作性能
+  - 自动识别慢操作（>1 秒）
+  - 查看详细的性能统计
+  - 命令：`GitForWriter: View Performance Statistics`
+
 ## 📦 安装
 
 ### 从 VSIX 文件安装
@@ -279,6 +295,27 @@ Unified Provider 通过 Vercel AI SDK 提供对多个 LLM 提供商的统一访�
 }
 ```
 
+### 性能优化配置
+
+```json
+{
+  "gitforwriter.performance.debounceDelay": 2000,      // 文档保存防抖延迟（毫秒，0-10000）
+  "gitforwriter.performance.enableCache": true,        // 启用 AI 响应缓存
+  "gitforwriter.performance.cacheTTL": 3600000,        // 缓存过期时间（毫秒，1分钟-24小时）
+  "gitforwriter.performance.cacheMaxSize": 104857600   // 最大缓存大小（字节，10MB-500MB）
+}
+```
+
+**性能优化说明：**
+- **debounceDelay**: 设置为 0 可禁用防抖，立即分析；设置为更大值可减少频繁保存时的分析次数
+- **enableCache**: 启用后会缓存 AI 分析结果，相同内容不会重复调用 API
+- **cacheTTL**: 缓存有效期，过期后会重新调用 API 获取最新结果
+- **cacheMaxSize**: 缓存占用的最大内存，超出后会自动清理最久未使用的条目
+
+**性能监控命令：**
+- `GitForWriter: View Performance Statistics` - 查看性能统计
+- `GitForWriter: Clear AI Cache` - 手动清空缓存
+
 ### 其他配置选项
 
 ```json
@@ -317,6 +354,8 @@ Unified Provider 通过 Vercel AI SDK 提供对多个 LLM 提供商的统一访�
 | `GitForWriter: Start Writing Project` | 初始化写作项目 | - |
 | `GitForWriter: AI Review` | 执行 AI 审校 | - |
 | `GitForWriter: Export Draft` | 导出作品 | - |
+| `GitForWriter: View Performance Statistics` | 查看性能统计 | - |
+| `GitForWriter: Clear AI Cache` | 清空 AI 缓存 | - |
 
 ## 📚 使用场景
 

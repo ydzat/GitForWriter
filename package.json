@@ -75,6 +75,14 @@
       {
         "command": "gitforwriter.disableStatistics",
         "title": "GitForWriter: Disable Statistics"
+      },
+      {
+        "command": "gitforwriter.viewPerformance",
+        "title": "GitForWriter: View Performance Statistics"
+      },
+      {
+        "command": "gitforwriter.clearCache",
+        "title": "GitForWriter: Clear AI Cache"
       }
     ],
     "configuration": {
@@ -216,6 +224,32 @@
           "minimum": 10000,
           "maximum": 600000,
           "description": "Timeout for LaTeX compilation in milliseconds (10-600 seconds)"
+        },
+        "gitforwriter.performance.debounceDelay": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 0,
+          "maximum": 10000,
+          "description": "Delay in milliseconds before analyzing document changes (0-10 seconds)"
+        },
+        "gitforwriter.performance.enableCache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable AI response caching to reduce API calls and costs"
+        },
+        "gitforwriter.performance.cacheTTL": {
+          "type": "number",
+          "default": 3600000,
+          "minimum": 60000,
+          "maximum": 86400000,
+          "description": "Cache time-to-live in milliseconds (1 minute - 24 hours)"
+        },
+        "gitforwriter.performance.cacheMaxSize": {
+          "type": "number",
+          "default": 104857600,
+          "minimum": 10485760,
+          "maximum": 524288000,
+          "description": "Maximum cache size in bytes (10MB - 500MB)"
         }
       }
     }

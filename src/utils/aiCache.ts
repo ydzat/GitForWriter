@@ -1,0 +1,255 @@
+import * as crypto from 'crypto';
+
+/**
+ * Cache entry with TTL support
+ */
+interface CacheEntry<T> {
+    data: T;
+    timestamp: number;
+    size: number; // Estimated size in bytes
+}
+
+/**
+ * LRU Cache configuration
+ */
+export interface CacheConfig {
+    maxSize: number; // Maximum cache size in bytes (default: 100MB)
+    ttl: number; // Time-to-live in milliseconds (default: 1 hour)
+    enabled: boolean; // Enable/disable caching
+}
+
+/**
+ * LRU Cache for AI responses
+ * Implements Least Recently Used eviction policy with TTL and size limits
+ */
+export class AICache<T> {
+    private cache: Map<string, CacheEntry<T>>;
+    private accessOrder: string[]; // Track access order for LRU
+    private currentSize: number; // Current cache size in bytes
+    private config: CacheConfig;
+    private hits: number;
+    private misses: number;
+
+    constructor(config?: Partial<CacheConfig>) {
+        this.cache = new Map();
+        this.accessOrder = [];
+        this.currentSize = 0;
+        this.hits = 0;
+        this.misses = 0;
+
+        // Default configuration
+        this.config = {
+            maxSize: config?.maxSize ?? 100 * 1024 * 1024, // 100MB
+            ttl: config?.ttl ?? 60 * 60 * 1000, // 1 hour
+            enabled: config?.enabled ?? true
+        };
+    }
+
+    /**
+     * Generate cache key from content using SHA-256 hash
+     */
+    private generateKey(content: string, operation: string): string {
+        const hash = crypto.createHash('sha256');
+        hash.update(`${operation}:${content}`);
+        return hash.digest('hex');
+    }
+
+    /**
+     * Estimate size of data in bytes
+     */
+    private estimateSize(data: T): number {
+        try {
+            return Buffer.byteLength(JSON.stringify(data), 'utf8');
+        } catch {
+            // Fallback estimation
+            return 1024; // 1KB default
+        }
+    }
+
+    /**
+     * Check if entry is expired
+     */
+    private isExpired(entry: CacheEntry<T>): boolean {
+        return Date.now() - entry.timestamp > this.config.ttl;
+    }
+
+    /**
+     * Evict least recently used entries until size is under limit
+     */
+    private evictLRU(): void {
+        while (this.currentSize > this.config.maxSize && this.accessOrder.length > 0) {
+            const oldestKey = this.accessOrder.shift();
+            if (oldestKey) {
+                const entry = this.cache.get(oldestKey);
+                if (entry) {
+                    this.currentSize -= entry.size;
+                    this.cache.delete(oldestKey);
+                }
+            }
+        }
+    }
+
+    /**
+     * Update access order for LRU
+     */
+    private updateAccessOrder(key: string): void {
+        // Remove key from current position
+        const index = this.accessOrder.indexOf(key);
+        if (index > -1) {
+            this.accessOrder.splice(index, 1);
+        }
+        // Add to end (most recently used)
+        this.accessOrder.push(key);
+    }
+
+    /**
+     * Get cached data
+     */
+    get(content: string, operation: string): T | null {
+        if (!this.config.enabled) {
+            return null;
+        }
+
+        const key = this.generateKey(content, operation);
+        const entry = this.cache.get(key);
+
+        if (!entry) {
+            this.misses++;
+            return null;
+        }
+
+        // Check if expired
+        if (this.isExpired(entry)) {
+            this.cache.delete(key);
+            this.currentSize -= entry.size;
+            const index = this.accessOrder.indexOf(key);
+            if (index > -1) {
+                this.accessOrder.splice(index, 1);
+            }
+            this.misses++;
+            return null;
+        }
+
+        // Update access order
+        this.updateAccessOrder(key);
+        this.hits++;
+        return entry.data;
+    }
+
+    /**
+     * Set cached data
+     */
+    set(content: string, operation: string, data: T): void {
+        if (!this.config.enabled) {
+            return;
+        }
+
+        const key = this.generateKey(content, operation);
+        const size = this.estimateSize(data);
+
+        // Remove old entry if exists
+        const oldEntry = this.cache.get(key);
+        if (oldEntry) {
+            this.currentSize -= oldEntry.size;
+        }
+
+        // Create new entry
+        const entry: CacheEntry<T> = {
+            data,
+            timestamp: Date.now(),
+            size
+        };
+
+        this.cache.set(key, entry);
+        this.currentSize += size;
+        this.updateAccessOrder(key);
+
+        // Evict if necessary
+        this.evictLRU();
+    }
+
+    /**
+     * Clear all cache entries
+     */
+    clear(): void {
+        this.cache.clear();
+        this.accessOrder = [];
+        this.currentSize = 0;
+        this.hits = 0;
+        this.misses = 0;
+    }
+
+    /**
+     * Get cache statistics
+     */
+    getStats(): {
+        size: number;
+        entries: number;
+        hits: number;
+        misses: number;
+        hitRate: number;
+        sizeInMB: number;
+    } {
+        const total = this.hits + this.misses;
+        return {
+            size: this.currentSize,
+            entries: this.cache.size,
+            hits: this.hits,
+            misses: this.misses,
+            hitRate: total > 0 ? this.hits / total : 0,
+            sizeInMB: this.currentSize / (1024 * 1024)
+        };
+    }
+
+    /**
+     * Enable or disable cache
+     */
+    setEnabled(enabled: boolean): void {
+        this.config.enabled = enabled;
+        if (!enabled) {
+            this.clear();
+        }
+    }
+
+    /**
+     * Update cache configuration
+     */
+    updateConfig(config: Partial<CacheConfig>): void {
+        this.config = { ...this.config, ...config };
+
+        // If size limit decreased, evict entries
+        if (config.maxSize !== undefined && this.currentSize > config.maxSize) {
+            this.evictLRU();
+        }
+    }
+
+    /**
+     * Clean up expired entries
+     */
+    cleanExpired(): number {
+        let cleaned = 0;
+        const keysToDelete: string[] = [];
+
+        for (const [key, entry] of this.cache.entries()) {
+            if (this.isExpired(entry)) {
+                keysToDelete.push(key);
+            }
+        }
+
+        for (const key of keysToDelete) {
+            const entry = this.cache.get(key);
+            if (entry) {
+                this.currentSize -= entry.size;
+                this.cache.delete(key);
+                const index = this.accessOrder.indexOf(key);
+                if (index > -1) {
+                    this.accessOrder.splice(index, 1);
+                }
+                cleaned++;
+            }
+        }
+
+        return cleaned;
+    }
+}
+

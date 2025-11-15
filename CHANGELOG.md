@@ -37,9 +37,43 @@ All notable changes to the GitForWriter extension will be documented in this fil
 
 ## [Unreleased]
 
+### Added
+- ⚡ **性能优化系统** (Issue #20)
+  - AI 响应缓存：智能缓存 AI 分析结果，减少重复 API 调用
+    - LRU 缓存策略，自动管理内存
+    - 可配置的缓存大小和过期时间
+    - 显著降低 API 成本和响应时间
+  - 文档保存防抖：避免频繁保存时的重复分析
+    - 可配置的延迟时间（默认 2 秒）
+    - 智能合并连续的保存操作
+  - Git 操作缓存：缓存 Git 状态和 diff 结果
+    - 减少磁盘 I/O 操作
+    - 提升大型项目的响应速度
+  - 性能监控：实时追踪操作性能
+    - 自动识别慢操作（>1 秒）
+    - 详细的性能统计（平均值、最小值、最大值）
+- 🎨 **新增命令**
+  - `GitForWriter: View Performance Statistics` - 查看性能统计
+  - `GitForWriter: Clear AI Cache` - 清空 AI 缓存
+- 📊 **新增配置选项**
+  - `gitforwriter.performance.debounceDelay` - 文档保存防抖延迟
+  - `gitforwriter.performance.enableCache` - 启用/禁用 AI 缓存
+  - `gitforwriter.performance.cacheTTL` - 缓存过期时间
+  - `gitforwriter.performance.cacheMaxSize` - 最大缓存大小
+- 📚 **新增文档**
+  - `PERFORMANCE.md` - 性能优化指南和最佳实践
+
+### Technical
+- 实现 `AICache` 类：LRU 缓存，支持 TTL 和大小限制
+- 实现 `debounce` 函数：通用防抖工具
+- 实现 `PerformanceMonitor` 类：性能监控和统计
+- 优化 `GitManager`：添加 Git 状态和 diff 缓存
+- 优化 `UnifiedProvider`：集成 AI 响应缓存
+- 优化 `extension.ts`：添加防抖和性能监控
+- 新增单元测试：`aiCache.test.ts`、`debounce.test.ts`
+- 测试覆盖率：575 个测试通过
+
 ### Planned
-- 集成外部 AI 模型（GPT-4, Claude 等）
 - 多人协作功能
-- 写作统计和分析
 - 自定义审校规则
 - 更多导出格式支持
