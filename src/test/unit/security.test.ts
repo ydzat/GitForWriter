@@ -8,7 +8,20 @@ import * as os from 'os';
 
 describe('Security Test Suite', () => {
     describe('Input Validation - Path Traversal', () => {
-        const workspaceRoot = '/workspace/test';
+        let workspaceRoot: string;
+        let tempDir: string;
+
+        beforeEach(() => {
+            // Use a real temporary directory for cross-platform compatibility
+            tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gitforwriter-path-test-'));
+            workspaceRoot = tempDir;
+        });
+
+        afterEach(() => {
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        });
 
         it('Should reject path traversal with ../', () => {
             assert.throws(() => {
@@ -17,8 +30,9 @@ describe('Security Test Suite', () => {
         });
 
         it('Should reject path traversal with absolute path outside workspace', () => {
+            const outsidePath = path.join(os.tmpdir(), 'outside.txt');
             assert.throws(() => {
-                InputValidator.validateFilePath('/etc/passwd', workspaceRoot);
+                InputValidator.validateFilePath(outsidePath, workspaceRoot);
             }, /outside workspace/);
         });
 
@@ -35,7 +49,7 @@ describe('Security Test Suite', () => {
 
         it('Should accept path equal to workspace root', () => {
             const result = InputValidator.validateFilePath('.', workspaceRoot);
-            assert.strictEqual(result, workspaceRoot);
+            assert.strictEqual(path.resolve(result), path.resolve(workspaceRoot));
         });
 
         it('Should accept valid absolute path within workspace', () => {
