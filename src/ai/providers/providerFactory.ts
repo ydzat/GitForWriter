@@ -3,6 +3,7 @@
  * Shared logic for initializing AI providers
  */
 
+import * as vscode from 'vscode';
 import { AIProvider } from './aiProvider';
 import { ConfigManager } from '../../config/configManager';
 import { SecretManager } from '../../config/secretManager';
@@ -13,9 +14,11 @@ import { SecretManager } from '../../config/secretManager';
  */
 export async function initializeAIProvider(
     configManager: ConfigManager,
-    secretManager: SecretManager
+    secretManager: SecretManager,
+    outputChannel?: vscode.OutputChannel
 ): Promise<AIProvider | null> {
     const config = configManager.getConfig();
+    const perfConfig = configManager.getPerformanceConfig();
     const provider = config.provider;
 
     if (provider === 'unified') {
@@ -39,7 +42,11 @@ export async function initializeAIProvider(
             provider: unifiedProvider,
             model: config.unified.model,
             apiKey,
-            ...(config.unified.baseURL && { baseURL: config.unified.baseURL })
+            ...(config.unified.baseURL && { baseURL: config.unified.baseURL }),
+            enableCache: perfConfig.enableCache,
+            cacheTTL: perfConfig.cacheTTL,
+            cacheMaxSize: perfConfig.cacheMaxSize,
+            ...(outputChannel && { outputChannel })
         };
         return new UnifiedProvider(providerConfig);
     } else if (provider === 'openai') {

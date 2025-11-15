@@ -14,6 +14,7 @@ import { ConfigManager } from './config/configManager';
 import { StatsCollector } from './analytics/statsCollector';
 import { errorHandler } from './utils/errorHandlerUI';
 import { GitError } from './utils/errorHandler';
+import { debounce, PerformanceMonitor } from './utils/debounce';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Load .env file for development/testing ONLY
@@ -28,13 +29,17 @@ export async function activate(context: vscode.ExtensionContext) {
 
     console.log('GitForWriter is now active');
 
+    // Create output channel for performance logging
+    const outputChannel = vscode.window.createOutputChannel('GitForWriter Performance');
+
     const gitManager = new GitManager();
     const statusBarManager = new StatusBarManager();
     const secretManager = new SecretManager(context.secrets);
     const configManager = new ConfigManager();
-    const diffAnalyzer = new DiffAnalyzer(configManager, secretManager);
-    const reviewEngine = new ReviewEngine(configManager, secretManager);
+    const diffAnalyzer = new DiffAnalyzer(configManager, secretManager, outputChannel);
+    const reviewEngine = new ReviewEngine(configManager, secretManager, outputChannel);
     const exportManager = new ExportManager();
+    const performanceMonitor = new PerformanceMonitor(1000, outputChannel); // 1s threshold
 
     // Initialize StatsCollector
     let statsCollector: StatsCollector | undefined;
@@ -76,7 +81,7 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     const aiReviewCommand = vscode.commands.registerCommand('gitforwriter.aiReview', async () => {
-        await performAIReview(context, gitManager, diffAnalyzer, reviewEngine);
+        await performAIReview(context, gitManager, diffAnalyzer, reviewEngine, performanceMonitor);
     });
 
     const exportDraftCommand = vscode.commands.registerCommand('gitforwriter.exportDraft', async () => {
@@ -126,9 +131,89 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // Register document save handler
+    // Performance statistics command
+    const viewPerformanceCommand = vscode.commands.registerCommand('gitforwriter.viewPerformance', async () => {
+        const stats = performanceMonitor.getAllStats();
+        let message = '📊 Performance Statistics:\n\n';
+
+        for (const [operation, stat] of stats) {
+            if (stat) {
+                message += `${operation}:\n`;
+                message += `  Count: ${stat.count}\n`;
+                message += `  Avg: ${stat.avg}ms\n`;
+                message += `  Min: ${stat.min}ms\n`;
+                message += `  Max: ${stat.max}ms\n\n`;
+            }
+        }
+
+        if (stats.size === 0) {
+            message = 'No performance data available yet.';
+        }
+
+        vscode.window.showInformationMessage(message, { modal: true });
+    });
+
+    // Clear cache command
+    const clearCacheCommand = vscode.commands.registerCommand('gitforwriter.clearCache', async () => {
+        // Clear cache via DiffAnalyzer
+        const cleared = diffAnalyzer.clearAICache();
+        if (cleared) {
+            vscode.window.showInformationMessage('✅ AI cache cleared successfully');
+        } else {
+            vscode.window.showWarningMessage('Cache clearing not available for current AI provider');
+        }
+    });
+
+    // Get debounce delay from configuration
+    const config = vscode.workspace.getConfiguration('gitforwriter');
+    let debounceDelay = config.get<number>('performance.debounceDelay', 2000);
+
+    // Create debounced document save handler
+    let debouncedHandleDocumentSave = debounce(
+        async (document: vscode.TextDocument) => {
+            await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector, previousWordCounts, performanceMonitor);
+        },
+        debounceDelay
+    );
+
+    // Listen for configuration changes to update debounce delay
+    const configChangeListener = vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('gitforwriter.performance.debounceDelay')) {
+            const newConfig = vscode.workspace.getConfiguration('gitforwriter');
+            const newDelay = newConfig.get<number>('performance.debounceDelay', 2000);
+            if (newDelay !== debounceDelay) {
+                debounceDelay = newDelay;
+                // Recreate debounced handler with new delay
+                debouncedHandleDocumentSave = debounce(
+                    async (document: vscode.TextDocument) => {
+                        await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector, previousWordCounts, performanceMonitor);
+                    },
+                    debounceDelay
+                );
+            }
+        }
+    });
+
+    // Register document save handler with debouncing
     const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
-        await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector, previousWordCounts);
+        // Show queued indicator (actual analysis starts after debounce delay)
+        const statusBarDisposable = vscode.window.setStatusBarMessage(
+            debounceDelay > 0
+                ? '$(clock) Queued for analysis...'
+                : '$(sync~spin) Analyzing changes...'
+        );
+        try {
+            await debouncedHandleDocumentSave(document);
+        } catch (err) {
+            // Error handling is done inside handleDocumentSave
+            // Log unexpected errors for debugging
+            if (err) {
+                console.error('Unexpected error in document save handler:', err);
+                vscode.window.showErrorMessage('An unexpected error occurred during document analysis. See console for details.');
+            }
+        } finally {
+            statusBarDisposable.dispose();
+        }
     });
 
     context.subscriptions.push(
@@ -142,6 +227,9 @@ export async function activate(context: vscode.ExtensionContext) {
         viewStatsCommand,
         enableStatsCommand,
         disableStatsCommand,
+        viewPerformanceCommand,
+        clearCacheCommand,
+        configChangeListener,
         saveHandler,
         statusBarManager
     );
@@ -199,7 +287,8 @@ async function performAIReview(
     context: vscode.ExtensionContext,
     gitManager: GitManager,
     diffAnalyzer: DiffAnalyzer,
-    reviewEngine: ReviewEngine
+    reviewEngine: ReviewEngine,
+    performanceMonitor: PerformanceMonitor
 ) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -213,27 +302,39 @@ async function performAIReview(
         return;
     }
 
+    // Start performance monitoring after validation
+    const endTiming = performanceMonitor.start('ai-review');
+
     try {
         vscode.window.showInformationMessage('🔍 Analyzing changes...');
 
         // Get git diff
+        const endDiffTiming = performanceMonitor.start('git-diff');
         const diff = await gitManager.getDiff(document.fileName);
+        endDiffTiming();
 
         // Get full content
         const fullContent = document.getText();
 
         // Analyze diff semantically
+        const endAnalysisTiming = performanceMonitor.start('diff-analysis');
         const analysis = await diffAnalyzer.analyze(diff, fullContent);
+        endAnalysisTiming();
 
         // Generate review with file path and content for precise suggestions
+        const endReviewTiming = performanceMonitor.start('review-generation');
         const review = await reviewEngine.generateReview(analysis, document.fileName, fullContent);
+        endReviewTiming();
+
         review.documentVersion = document.version;
 
         // Show review panel
         AIReviewPanel.createOrShow(context.extensionUri, review, document.fileName);
 
         vscode.window.showInformationMessage('✅ AI Review completed');
+        endTiming();
     } catch (error) {
+        endTiming();
         vscode.window.showErrorMessage(`AI Review failed: ${error}`);
     }
 }
@@ -268,7 +369,8 @@ async function handleDocumentSave(
     gitManager: GitManager,
     diffAnalyzer: DiffAnalyzer,
     statsCollector: StatsCollector | undefined,
-    previousWordCounts: Map<string, number>
+    previousWordCounts: Map<string, number>,
+    performanceMonitor: PerformanceMonitor
 ) {
     // Only process Markdown and LaTeX files
     if (!['markdown', 'latex'].includes(document.languageId)) {
@@ -285,6 +387,9 @@ async function handleDocumentSave(
         return;
     }
 
+    // Start performance monitoring after validation
+    const endTiming = performanceMonitor.start('document-save');
+
     // Collect writing statistics
     if (statsCollector && statsCollector.isEnabled()) {
         const text = document.getText();
@@ -299,9 +404,12 @@ async function handleDocumentSave(
 
     try {
         // Get diff
+        const endDiffTiming = performanceMonitor.start('git-diff');
         const diff = await gitManager.getDiff(document.fileName);
-        
+        endDiffTiming();
+
         if (!diff || diff.trim() === '') {
+            endTiming();
             return;
         }
 
@@ -318,14 +426,18 @@ async function handleDocumentSave(
         fs.writeFileSync(diffPath, diff);
 
         // Quick analysis
+        const endAnalysisTiming = performanceMonitor.start('diff-analysis');
         const analysis = await diffAnalyzer.quickAnalyze(diff);
-        
+        endAnalysisTiming();
+
         // Save analysis
         const analysisPath = path.join(gitforwriterDir, `${fileName}_${timestamp}.json`);
         fs.writeFileSync(analysisPath, JSON.stringify(analysis, null, 2));
 
         console.log(`Diff saved: ${diffPath}`);
+        endTiming();
     } catch (error: any) {
+        endTiming();
         // Only use errorHandler if it's initialized (workspace folder exists)
         if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
             errorHandler.handleSilent(error, { context: 'document_save' });

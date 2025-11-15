@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { LanguageModelV2 } from '@ai-sdk/provider';
+import * as vscode from 'vscode';
 import {
     AIProvider,
     AIResponse,
@@ -15,6 +16,7 @@ import {
     ReviewContext,
     TokenUsage
 } from './aiProvider';
+import { AICache } from '../../utils/aiCache';
 
 /**
  * Unified provider configuration
@@ -26,6 +28,10 @@ export interface UnifiedProviderConfig {
     baseURL?: string; // For OpenAI-compatible APIs
     maxRetries?: number;
     timeout?: number;
+    enableCache?: boolean; // Enable AI response caching
+    cacheTTL?: number; // Cache TTL in milliseconds
+    cacheMaxSize?: number; // Max cache size in bytes
+    outputChannel?: vscode.OutputChannel; // For logging
 }
 
 /**
@@ -38,6 +44,10 @@ export class UnifiedProvider implements AIProvider {
     private modelName: string;
     private maxRetries: number;
     private timeout: number;
+    private diffCache: AICache<DiffAnalysis>;
+    private reviewCache: AICache<TextReview>;
+    private suggestionsCache: AICache<Suggestion[]>;
+    private outputChannel: vscode.OutputChannel | null;
 
     constructor(config: UnifiedProviderConfig) {
         if (!config.apiKey || config.apiKey.trim() === '') {
@@ -47,6 +57,17 @@ export class UnifiedProvider implements AIProvider {
         this.modelName = config.model;
         this.maxRetries = config.maxRetries ?? 3;
         this.timeout = config.timeout ?? 60000; // Default 60 seconds
+        this.outputChannel = config.outputChannel || null;
+
+        // Initialize caches
+        const cacheConfig = {
+            enabled: config.enableCache ?? true,
+            ttl: config.cacheTTL ?? 60 * 60 * 1000, // Default 1 hour
+            maxSize: config.cacheMaxSize ?? 100 * 1024 * 1024 // Default 100MB
+        };
+        this.diffCache = new AICache<DiffAnalysis>(cacheConfig);
+        this.reviewCache = new AICache<TextReview>(cacheConfig);
+        this.suggestionsCache = new AICache<Suggestion[]>(cacheConfig);
 
         // Validate baseURL if provided (security check)
         if (config.baseURL) {
@@ -82,6 +103,43 @@ export class UnifiedProvider implements AIProvider {
     }
 
     /**
+     * Generate cache key from content and metadata
+     * Combines content with stringified metadata to prevent key collisions
+     * The AICache will hash this combined string with SHA-256
+     * Note: The operation type is passed separately to AICache.get/set methods
+     */
+    private generateCacheKey(content: string, metadata: any): string {
+        // Combine content with metadata separator to avoid collisions
+        // AICache.generateKey will hash this entire string along with the operation type
+        // Use deterministic JSON serialization to ensure consistent cache keys
+        const metadataStr = metadata ? this.stringifyDeterministic(metadata) : '';
+        return `${content}\n---METADATA---\n${metadataStr}`;
+    }
+
+    /**
+     * Deterministic JSON stringification with sorted keys
+     * Ensures consistent cache keys for objects with same properties in different orders
+     */
+    private stringifyDeterministic(obj: any): string {
+        if (obj === null || obj === undefined) {
+            return JSON.stringify(obj);
+        }
+        if (typeof obj !== 'object') {
+            return JSON.stringify(obj);
+        }
+        if (Array.isArray(obj)) {
+            return '[' + obj.map(item => this.stringifyDeterministic(item)).join(',') + ']';
+        }
+        // Sort object keys for deterministic output
+        const sortedKeys = Object.keys(obj).sort();
+        const pairs = sortedKeys.map(key => {
+            const value = this.stringifyDeterministic(obj[key]);
+            return `"${key}":${value}`;
+        });
+        return '{' + pairs.join(',') + '}';
+    }
+
+    /**
      * Validate the provider configuration
      */
     async validate(): Promise<boolean> {
@@ -112,11 +170,31 @@ export class UnifiedProvider implements AIProvider {
      * Analyze a diff and extract semantic changes
      */
     async analyzeDiff(diff: string, context?: AnalysisContext): Promise<AIResponse<DiffAnalysis>> {
+        // Check cache first
+        const cacheKey = this.generateCacheKey(diff, context);
+        const cached = this.diffCache.get(cacheKey, 'diff-analysis');
+        if (cached) {
+            if (this.outputChannel) {
+                this.outputChannel.appendLine('✅ Cache hit for diff analysis');
+            }
+            return {
+                data: cached,
+                tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedCost: 0 },
+                model: this.modelName,
+                timestamp: new Date()
+            };
+        }
+
         const prompt = this.buildDiffAnalysisPrompt(diff, context);
 
         try {
             const response = await this.callAI(prompt, 'diff-analysis');
             const analysis = this.parseDiffAnalysis(response.content, diff);
+
+            // Cache the result (async, but don't wait)
+            this.diffCache.set(cacheKey, 'diff-analysis', analysis).catch(() => {
+                // Ignore cache errors - they shouldn't affect the main operation
+            });
 
             return {
                 data: analysis,
@@ -133,11 +211,31 @@ export class UnifiedProvider implements AIProvider {
      * Review text and provide suggestions
      */
     async reviewText(text: string, context?: ReviewContext): Promise<AIResponse<TextReview>> {
+        // Check cache first
+        const cacheKey = this.generateCacheKey(text, context);
+        const cached = this.reviewCache.get(cacheKey, 'text-review');
+        if (cached) {
+            if (this.outputChannel) {
+                this.outputChannel.appendLine('✅ Cache hit for text review');
+            }
+            return {
+                data: cached,
+                tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedCost: 0 },
+                model: this.modelName,
+                timestamp: new Date()
+            };
+        }
+
         const prompt = this.buildTextReviewPrompt(text, context);
 
         try {
             const response = await this.callAI(prompt, 'text-review');
             const review = this.parseTextReview(response.content);
+
+            // Cache the result (async, but don't wait)
+            this.reviewCache.set(cacheKey, 'text-review', review).catch(() => {
+                // Ignore cache errors - they shouldn't affect the main operation
+            });
 
             return {
                 data: review,
@@ -154,11 +252,31 @@ export class UnifiedProvider implements AIProvider {
      * Generate suggestions based on identified issues
      */
     async generateSuggestions(text: string, issues: Issue[]): Promise<AIResponse<Suggestion[]>> {
+        // Check cache first
+        const cacheKey = this.generateCacheKey(text, issues);
+        const cached = this.suggestionsCache.get(cacheKey, 'generate-suggestions');
+        if (cached) {
+            if (this.outputChannel) {
+                this.outputChannel.appendLine('✅ Cache hit for suggestions');
+            }
+            return {
+                data: cached,
+                tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimatedCost: 0 },
+                model: this.modelName,
+                timestamp: new Date()
+            };
+        }
+
         const prompt = this.buildSuggestionsPrompt(text, issues);
 
         try {
             const response = await this.callAI(prompt, 'generate-suggestions');
             const suggestions = this.parseSuggestions(response.content);
+
+            // Cache the result (async, but don't wait)
+            this.suggestionsCache.set(cacheKey, 'generate-suggestions', suggestions).catch(() => {
+                // Ignore cache errors - they shouldn't affect the main operation
+            });
 
             return {
                 data: suggestions,
@@ -570,6 +688,41 @@ Respond ONLY with valid JSON.`;
         }
 
         return new AIProviderError(`${operation} failed: ${message}`, 'UNKNOWN_ERROR', statusCode, error);
+    }
+
+    /**
+     * Get cache statistics
+     */
+    getCacheStats() {
+        return {
+            diff: this.diffCache.getStats(),
+            review: this.reviewCache.getStats(),
+            suggestions: this.suggestionsCache.getStats()
+        };
+    }
+
+    /**
+     * Clear all caches
+     */
+    clearCache() {
+        this.diffCache.clear();
+        this.reviewCache.clear();
+        this.suggestionsCache.clear();
+    }
+
+    /**
+     * Clean expired cache entries
+     */
+    cleanExpiredCache() {
+        const diffCleaned = this.diffCache.cleanExpired();
+        const reviewCleaned = this.reviewCache.cleanExpired();
+        const suggestionsCleaned = this.suggestionsCache.cleanExpired();
+        return {
+            diff: diffCleaned,
+            review: reviewCleaned,
+            suggestions: suggestionsCleaned,
+            total: diffCleaned + reviewCleaned + suggestionsCleaned
+        };
     }
 }
 

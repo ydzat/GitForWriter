@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { AIProvider, AnalysisContext } from '../providers/aiProvider';
 import { ConfigManager } from '../../config/configManager';
 import { SecretManager } from '../../config/secretManager';
@@ -13,7 +14,8 @@ export class DiffAnalyzer {
 
     constructor(
         private configManager: ConfigManager,
-        private secretManager: SecretManager
+        private secretManager: SecretManager,
+        private outputChannel?: vscode.OutputChannel
     ) {
         // Initialize provider asynchronously
         this.initializationPromise = this.initializeProvider();
@@ -24,7 +26,7 @@ export class DiffAnalyzer {
      */
     private async initializeProvider(): Promise<void> {
         try {
-            this.aiProvider = await initializeAIProvider(this.configManager, this.secretManager);
+            this.aiProvider = await initializeAIProvider(this.configManager, this.secretManager, this.outputChannel);
         } catch (error) {
             console.error('Failed to initialize AI provider:', error);
             this.aiProvider = null;
@@ -264,5 +266,17 @@ export class DiffAnalyzer {
         }
 
         return summary || '无明显变化';
+    }
+
+    /**
+     * Clear AI provider cache if available
+     * @returns true if cache was cleared, false if not available
+     */
+    clearAICache(): boolean {
+        if (this.aiProvider && typeof (this.aiProvider as any).clearCache === 'function') {
+            (this.aiProvider as any).clearCache();
+            return true;
+        }
+        return false;
     }
 }
