@@ -81,7 +81,7 @@ export class StatsCollector {
         }
 
         return {
-            enabled: false, // Opt-in by default
+            enabled: false, // Disabled by default (opt-in required)
             sessions: [],
             dailyStats: {},
             totalWords: 0,
