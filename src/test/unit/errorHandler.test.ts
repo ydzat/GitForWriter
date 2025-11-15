@@ -330,6 +330,101 @@ describe('ErrorHandler', () => {
             // Each delay should be roughly double the previous (with some tolerance)
             expect(delays[1]).to.be.greaterThan(delays[0] * 1.5);
         });
+
+        it('should not retry when shouldRetry returns false', async () => {
+            let attempts = 0;
+            const fn = async () => {
+                attempts++;
+                throw new Error('Do not retry');
+            };
+
+            const shouldRetry = (error: Error) => !error.message.includes('Do not retry');
+
+            try {
+                await retryWithBackoff(fn, { maxRetries: 3, initialDelay: 10 }, shouldRetry);
+                expect.fail('Should have thrown');
+            } catch (error: any) {
+                expect(attempts).to.equal(1); // Should not retry
+                expect(error.message).to.include('Do not retry');
+            }
+        });
+    });
+
+    describe('NetworkError', () => {
+        it('should provide user message for TIMEOUT error', () => {
+            const error = new NetworkError('Request timed out', 'TIMEOUT');
+            expect(error.getUserMessage()).to.include('timed out');
+        });
+
+        it('should provide user message for NO_CONNECTION error', () => {
+            const error = new NetworkError('No connection', 'NO_CONNECTION');
+            expect(error.getUserMessage()).to.include('No internet connection');
+        });
+
+        it('should provide user message for RATE_LIMIT error', () => {
+            const error = new NetworkError('Rate limit', 'RATE_LIMIT');
+            expect(error.getUserMessage()).to.include('Rate limit exceeded');
+        });
+
+        it('should provide suggested actions for TIMEOUT', () => {
+            const error = new NetworkError('Timeout', 'TIMEOUT');
+            const actions = error.getSuggestedActions();
+            expect(actions.some(a => a.includes('internet connection'))).to.be.true;
+        });
+
+        it('should provide suggested actions for NO_CONNECTION', () => {
+            const error = new NetworkError('No connection', 'NO_CONNECTION');
+            const actions = error.getSuggestedActions();
+            expect(actions.some(a => a.includes('Connect to the internet'))).to.be.true;
+        });
+
+        it('should provide suggested actions for RATE_LIMIT', () => {
+            const error = new NetworkError('Rate limit', 'RATE_LIMIT');
+            const actions = error.getSuggestedActions();
+            expect(actions.some(a => a.includes('Wait a few minutes'))).to.be.true;
+        });
+
+        it('should provide default suggested actions for other errors', () => {
+            const error = new NetworkError('Unknown network error', 'UNKNOWN');
+            const actions = error.getSuggestedActions();
+            expect(actions.some(a => a.includes('Try again later'))).to.be.true;
+        });
+    });
+
+    describe('ExportError', () => {
+        it('should provide user message for LATEX_NOT_FOUND', () => {
+            const error = new ExportError('LaTeX not found', 'LATEX_NOT_FOUND');
+            expect(error.getUserMessage()).to.include('LaTeX is not installed');
+        });
+
+        it('should provide user message for COMPILATION_FAILED', () => {
+            const error = new ExportError('Compilation failed', 'COMPILATION_FAILED');
+            expect(error.getUserMessage()).to.include('Export failed');
+        });
+
+        it('should provide user message for UNSUPPORTED_FORMAT', () => {
+            const error = new ExportError('Unsupported format', 'UNSUPPORTED_FORMAT', undefined, { format: 'docx' });
+            expect(error.getUserMessage()).to.include('Unsupported export format');
+            expect(error.getUserMessage()).to.include('docx');
+        });
+
+        it('should provide suggested actions for LATEX_NOT_FOUND', () => {
+            const error = new ExportError('LaTeX not found', 'LATEX_NOT_FOUND');
+            const actions = error.getSuggestedActions();
+            expect(actions.some(a => a.includes('Install LaTeX'))).to.be.true;
+        });
+
+        it('should provide suggested actions for UNSUPPORTED_FORMAT', () => {
+            const error = new ExportError('Unsupported format', 'UNSUPPORTED_FORMAT');
+            const actions = error.getSuggestedActions();
+            expect(actions.some(a => a.includes('supported formats'))).to.be.true;
+        });
+
+        it('should provide default suggested actions for other errors', () => {
+            const error = new ExportError('Unknown export error', 'UNKNOWN');
+            const actions = error.getSuggestedActions();
+            expect(actions.some(a => a.includes('file permissions'))).to.be.true;
+        });
     });
 });
 

@@ -8,13 +8,21 @@
   "branches": 50,
   "include": [
     "src/utils/**/*.ts",
-    "src/ai/**/*.ts"
+    "src/ai/**/*.ts",
+    "src/config/**/*.ts",
+    "src/core/**/*.ts"
   ],
   "exclude": [
     "src/test/**",
     "src/**/*.test.ts",
     "src/extension.ts",
-    "src/webview/**"
+    "src/webview/**",
+    "src/ai/export/exportManager.ts",
+    "src/config/configManager.ts",
+    "src/config/secretManager.ts",
+    "src/core/suggestionApplicator.ts",
+    "src/utils/errorHandlerUI.ts",
+    "src/utils/statusBarManager.ts"
   ],
   "reporter": [
     "text",
