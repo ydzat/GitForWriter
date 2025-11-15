@@ -218,7 +218,11 @@ export class StatsCollector {
 
         const wordsAdded = Math.max(0, wordCount - previousWordCount);
 
+        // If switching to a different file, end current session first
         if (!this.currentSession || this.currentSession.filePath !== filePath) {
+            if (this.currentSession) {
+                this.endSession();
+            }
             this.startSession(filePath);
         }
 
@@ -310,12 +314,15 @@ export class StatsCollector {
             return;
         }
 
-        // Parse dates in local timezone to avoid UTC midnight issues
+        // Calculate day difference using date components to avoid DST issues
         const [lastYear, lastMonth, lastDay] = this.stats.lastWritingDate.split('-').map(Number);
         const [currYear, currMonth, currDay] = currentDate.split('-').map(Number);
-        const lastDate = new Date(lastYear, lastMonth - 1, lastDay);
-        const today = new Date(currYear, currMonth - 1, currDay);
-        const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Compare dates directly using components
+        const diffDays = this.calculateDayDifference(
+            lastYear, lastMonth, lastDay,
+            currYear, currMonth, currDay
+        );
 
         if (diffDays === 0) {
             // Same day, no change to streak
@@ -339,6 +346,23 @@ export class StatsCollector {
         const date = new Date(timestamp);
         // Use local time for date string generation to match streak calculation
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    /**
+     * Calculate day difference between two dates using date components
+     * This avoids DST issues that can occur with timestamp arithmetic
+     */
+    private calculateDayDifference(
+        year1: number, month1: number, day1: number,
+        year2: number, month2: number, day2: number
+    ): number {
+        // Create dates at noon to avoid DST edge cases
+        const date1 = new Date(year1, month1 - 1, day1, 12, 0, 0);
+        const date2 = new Date(year2, month2 - 1, day2, 12, 0, 0);
+
+        // Calculate difference in milliseconds and convert to days
+        const diffMs = date2.getTime() - date1.getTime();
+        return Math.round(diffMs / (1000 * 60 * 60 * 24));
     }
 
     /**
