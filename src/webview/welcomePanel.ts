@@ -42,7 +42,7 @@ export class WelcomePanel {
                         await this.handleProviderSelection(message.provider);
                         break;
                     case 'saveApiKey':
-                        await this.handleApiKeySave(message.provider, message.apiKey);
+                        await this.handleApiKeySave(message.apiKey);
                         break;
                     case 'testConfiguration':
                         await this.handleTestConfiguration();
@@ -58,6 +58,9 @@ export class WelcomePanel {
                         break;
                     case 'completeOnboarding':
                         await this.handleCompleteOnboarding();
+                        break;
+                    case 'showError':
+                        vscode.window.showErrorMessage(message.message);
                         break;
                 }
             },
@@ -132,14 +135,47 @@ export class WelcomePanel {
 
     /**
      * Handle API key save
+     * Gets provider from backend configuration instead of relying on frontend state
      */
-    private async handleApiKeySave(provider: string, apiKey: string): Promise<void> {
+    private async handleApiKeySave(apiKey: string): Promise<void> {
         try {
+            // Get provider from backend configuration (single source of truth)
+            const provider = this.configManager.getCurrentProvider();
+
+            if (!provider) {
+                this.sendMessage({ command: 'apiKeySaved', success: false, error: 'No provider selected' });
+                vscode.window.showErrorMessage('Please select a provider first');
+                return;
+            }
+
+            // Save API key based on provider
             if (provider === 'openai') {
                 await this.secretManager.setOpenAIKey(apiKey);
-            } else if (provider === 'claude' || provider === 'anthropic') {
+            } else if (provider === 'claude') {
                 await this.secretManager.setClaudeKey(apiKey);
+            } else if (provider === 'unified') {
+                // For unified provider, check the underlying provider
+                const config = this.configManager.getConfig();
+                if (config.unified.provider === 'openai') {
+                    await this.secretManager.setOpenAIKey(apiKey);
+                } else if (config.unified.provider === 'anthropic') {
+                    await this.secretManager.setClaudeKey(apiKey);
+                } else {
+                    this.sendMessage({ command: 'apiKeySaved', success: false, error: 'Unsupported unified provider' });
+                    vscode.window.showErrorMessage('Unsupported unified provider configuration');
+                    return;
+                }
+            } else if (provider === 'local') {
+                // Local provider doesn't need API key
+                this.sendMessage({ command: 'apiKeySaved', success: true });
+                vscode.window.showInformationMessage('Local provider does not require an API key');
+                return;
+            } else {
+                this.sendMessage({ command: 'apiKeySaved', success: false, error: `Unsupported provider: ${provider}` });
+                vscode.window.showErrorMessage(`Unsupported provider: ${provider}`);
+                return;
             }
+
             this.sendMessage({ command: 'apiKeySaved', success: true });
             vscode.window.showInformationMessage('API key saved successfully');
         } catch (error) {
@@ -644,15 +680,15 @@ Happy writing! 📝
         function saveApiKey() {
             const apiKey = document.getElementById('api-key-input').value;
             if (!apiKey) {
-                alert('Please enter an API key');
+                // Send error message to extension host instead of using alert()
+                vscode.postMessage({
+                    command: 'showError',
+                    message: 'Please enter an API key'
+                });
                 return;
             }
-            // Get provider from state or backend
-            if (!selectedProvider) {
-                alert('Please select a provider first');
-                return;
-            }
-            vscode.postMessage({ command: 'saveApiKey', provider: selectedProvider, apiKey });
+            // Send API key to backend - provider will be determined from backend config
+            vscode.postMessage({ command: 'saveApiKey', apiKey });
         }
 
         function testConfiguration() {
