@@ -1,14 +1,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 
 /**
  * Writing session data
+ *
+ * A session represents a continuous period of writing activity.
+ * Sessions are automatically ended after 5 minutes of inactivity (SESSION_TIMEOUT).
+ *
+ * Note: When a session is ended by timeout, the endTime and duration reflect
+ * the time of the last save action, not the timeout event itself.
  */
 export interface WritingSession {
     startTime: number;
     endTime: number;
-    duration: number; // milliseconds
+    duration: number; // milliseconds - time between first and last save in session
     wordsWritten: number;
     filePath: string;
     date: string; // YYYY-MM-DD
@@ -160,6 +165,20 @@ export class StatsCollector {
     }
 
     /**
+     * Dispose and cleanup resources
+     */
+    dispose(): void {
+        if (this.sessionTimeout) {
+            clearTimeout(this.sessionTimeout);
+            this.sessionTimeout = null;
+        }
+        // End current session if any
+        if (this.currentSession) {
+            this.endSession();
+        }
+    }
+
+    /**
      * Start a new writing session
      */
     startSession(filePath: string): void {
@@ -266,6 +285,7 @@ export class StatsCollector {
 
     /**
      * Update writing streaks
+     * Uses local timezone-aware date comparison to avoid UTC midnight issues
      */
     private updateStreaks(currentDate: string): void {
         if (!this.stats.lastWritingDate) {
@@ -275,8 +295,11 @@ export class StatsCollector {
             return;
         }
 
-        const lastDate = new Date(this.stats.lastWritingDate);
-        const today = new Date(currentDate);
+        // Parse dates in local timezone to avoid UTC midnight issues
+        const [lastYear, lastMonth, lastDay] = this.stats.lastWritingDate.split('-').map(Number);
+        const [currYear, currMonth, currDay] = currentDate.split('-').map(Number);
+        const lastDate = new Date(lastYear, lastMonth - 1, lastDay);
+        const today = new Date(currYear, currMonth - 1, currDay);
         const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
 
         if (diffDays === 0) {
@@ -312,9 +335,16 @@ export class StatsCollector {
         text = text.replace(/`[^`]*`/g, '');
         // Remove URLs
         text = text.replace(/https?:\/\/[^\s]+/g, '');
-        // Count words (including Chinese characters)
-        const words = text.match(/[\w\u4e00-\u9fa5]+/g);
-        return words ? words.length : 0;
+
+        // Count English words
+        const englishWords = text.match(/[a-zA-Z0-9_]+/g);
+        const englishCount = englishWords ? englishWords.length : 0;
+
+        // Count Chinese characters (each character is a word)
+        const chineseChars = text.match(/[\u4e00-\u9fa5]/g);
+        const chineseCount = chineseChars ? chineseChars.length : 0;
+
+        return englishCount + chineseCount;
     }
 }
 

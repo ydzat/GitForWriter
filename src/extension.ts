@@ -38,6 +38,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize StatsCollector
     let statsCollector: StatsCollector | undefined;
+    const previousWordCounts = new Map<string, number>();
     if (workspaceFolder) {
         statsCollector = new StatsCollector(workspaceFolder.uri.fsPath);
     }
@@ -120,7 +121,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register document save handler
     const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
-        await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector);
+        await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector, previousWordCounts);
     });
 
     context.subscriptions.push(
@@ -140,6 +141,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize status bar
     statusBarManager.updateStage('ideation');
+
+    // Store statsCollector for cleanup
+    context.subscriptions.push({
+        dispose: () => {
+            if (statsCollector) {
+                statsCollector.dispose();
+            }
+        }
+    });
 }
 
 async function startWritingProject(gitManager: GitManager, statusBarManager: StatusBarManager) {
@@ -250,7 +260,8 @@ async function handleDocumentSave(
     document: vscode.TextDocument,
     gitManager: GitManager,
     diffAnalyzer: DiffAnalyzer,
-    statsCollector?: StatsCollector
+    statsCollector: StatsCollector | undefined,
+    previousWordCounts: Map<string, number>
 ) {
     // Only process Markdown and LaTeX files
     if (!['markdown', 'latex'].includes(document.languageId)) {
@@ -272,9 +283,9 @@ async function handleDocumentSave(
         const text = document.getText();
         const wordCount = StatsCollector.countWords(text);
 
-        // Get previous word count from document metadata (if available)
-        const previousWordCount = (document as any)._previousWordCount || 0;
-        (document as any)._previousWordCount = wordCount;
+        // Get previous word count from persistent map
+        const previousWordCount = previousWordCounts.get(document.fileName) || 0;
+        previousWordCounts.set(document.fileName, wordCount);
 
         statsCollector.recordWordsWritten(document.fileName, wordCount, previousWordCount);
     }

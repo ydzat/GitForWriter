@@ -79,7 +79,7 @@ describe('StatsCollector Unit Tests', () => {
 
         it('should count Chinese characters as words', () => {
             const text = '这是一个测试';
-            expect(StatsCollector.countWords(text)).to.equal(5);
+            expect(StatsCollector.countWords(text)).to.equal(6);
         });
 
         it('should ignore code blocks', () => {
@@ -106,7 +106,7 @@ describe('StatsCollector Unit Tests', () => {
 
         it('should handle mixed content', () => {
             const text = 'Hello world 你好世界 test';
-            expect(StatsCollector.countWords(text)).to.equal(5);
+            expect(StatsCollector.countWords(text)).to.equal(7); // 3 English words + 4 Chinese characters
         });
     });
 

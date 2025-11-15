@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { StatsCollector, WritingStats, WritingSession } from '../analytics/statsCollector';
+import { StatsCollector, WritingStats } from '../analytics/statsCollector';
 
 /**
  * Statistics panel for displaying writing analytics
@@ -178,7 +178,7 @@ export class StatsPanel {
         const timeOfDayData = this.prepareTimeOfDayData(stats);
 
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -385,7 +385,7 @@ export class StatsPanel {
      */
     private getOptInHtml(): string {
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
