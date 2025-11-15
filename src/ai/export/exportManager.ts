@@ -27,6 +27,44 @@ export class ExportManager {
     private compilersDetected: boolean = false;
     private detectionPromise: Promise<void> | null = null;
 
+    // Static language mapping for code block syntax highlighting
+    private static readonly LANGUAGE_MAP: { [key: string]: string } = {
+        'js': 'JavaScript',
+        'javascript': 'JavaScript',
+        'ts': 'JavaScript',  // TypeScript uses JavaScript highlighting
+        'typescript': 'JavaScript',
+        'py': 'Python',
+        'python': 'Python',
+        'java': 'Java',
+        'cpp': 'C++',
+        'c++': 'C++',
+        'c': 'C',
+        'cs': '[Sharp]C',
+        'csharp': '[Sharp]C',
+        'c#': '[Sharp]C',
+        'f#': 'ML',  // F# uses ML highlighting
+        'fsharp': 'ML',
+        'rb': 'Ruby',
+        'ruby': 'Ruby',
+        // NOTE: 'Go' and 'Rust' are not natively supported by LaTeX listings package.
+        // If you use these languages, you must provide custom language definitions in the template preamble.
+        'go': 'Go',
+        'rust': 'Rust',
+        'php': 'PHP',
+        'sql': 'SQL',
+        'bash': 'bash',
+        'sh': 'bash',
+        'html': 'HTML',
+        'xml': 'XML',
+        'json': 'JavaScript',  // JSON uses JavaScript highlighting
+        'yaml': 'Python',  // YAML uses Python-like highlighting
+        'yml': 'Python',
+        'objective-c': 'Objective-C',
+        'objc': 'Objective-C',
+        'x86-64': 'Assembler',
+        'assembly': 'Assembler'
+    };
+
     constructor() {
         // Compiler detection will be done lazily on first use
     }
@@ -129,6 +167,21 @@ generator: GitForWriter
     }
 
     /**
+     * Escape special LaTeX characters in URLs
+     * Only escapes characters that break LaTeX, preserves URL structure
+     * Does not escape : / ? = . which are part of URL syntax
+     * SECURITY: Backslash must be escaped first to prevent LaTeX command injection
+     */
+    private escapeUrl(url: string): string {
+        return url
+            .replace(/\\/g, '\\textbackslash{}')  // Escape backslash first to prevent command injection
+            .replace(/#/g, '\\#')
+            .replace(/%/g, '\\%')
+            .replace(/&/g, '\\&')
+            .replace(/_/g, '\\_');
+    }
+
+    /**
      * Apply a LaTeX template to content
      */
     private applyTemplate(content: string, outputPath: string, templateType: TemplateType): string {
@@ -145,7 +198,28 @@ generator: GitForWriter
         if (templateType === 'default') {
             return `\\documentclass{article}
 \\usepackage[utf8]{inputenc}
+\\usepackage[T1]{fontenc}
 \\usepackage{hyperref}
+\\usepackage{graphicx}
+\\usepackage{amsmath}
+\\usepackage{listings}
+\\usepackage{xcolor}
+\\usepackage{array}
+\\usepackage{longtable}
+
+% Listings configuration for code syntax highlighting
+\\lstset{
+    basicstyle=\\ttfamily\\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\\tiny\\color{gray},
+    keywordstyle=\\color{blue},
+    commentstyle=\\color{green!60!black},
+    stringstyle=\\color{red},
+    showstringspaces=false,
+    tabsize=4
+}
 
 \\title{${title}}
 \\author{${author}}
@@ -249,62 +323,360 @@ ${content}
     private convertMarkdownToLatex(markdown: string): string {
         let latex = markdown;
 
-        // Convert headings
-        latex = latex.replace(/^# (.+)$/gm, '\\section{$1}');
-        latex = latex.replace(/^## (.+)$/gm, '\\subsection{$1}');
-        latex = latex.replace(/^### (.+)$/gm, '\\subsubsection{$1}');
-
-        // Convert bold and italic
-        latex = latex.replace(/\*\*(.+?)\*\*/g, '\\textbf{$1}');
-        latex = latex.replace(/\*(.+?)\*/g, '\\textit{$1}');
-        latex = latex.replace(/__(.+?)__/g, '\\textbf{$1}');
-        latex = latex.replace(/_(.+?)_/g, '\\textit{$1}');
-
-        // Convert code blocks
-        latex = latex.replace(/```(\w+)?\n([\s\S]+?)```/g, (_, lang, code) => {
-            return `\\begin{verbatim}\n${code}\\end{verbatim}`;
+        // Step 1: Protect raw LaTeX blocks (process first to avoid interference)
+        const latexBlocks: string[] = [];
+        latex = latex.replace(/\\begin\{(\w+)\}([\s\S]*?)\\end\{\1\}/g, (match) => {
+            const placeholder = `__LATEX_BLOCK_${latexBlocks.length}__`;
+            latexBlocks.push(match);
+            return placeholder;
         });
 
-        // Convert inline code
-        latex = latex.replace(/`(.+?)`/g, '\\texttt{$1}');
+        // Step 2: Convert math equations (before escaping special chars)
+        // Display math: $$...$$
+        latex = latex.replace(/\$\$([\s\S]+?)\$\$/g, (_, equation) => {
+            return `\\[\n${equation.trim()}\n\\]`;
+        });
 
-        // Convert links
-        latex = latex.replace(/\[(.+?)\]\((.+?)\)/g, '\\href{$2}{$1}');
+        // Inline math: $...$
+        latex = latex.replace(/\$(.+?)\$/g, (_, equation) => {
+            return `$${equation}$`;  // Keep as-is for LaTeX
+        });
 
-        // Convert lists
-        latex = latex.replace(/^\* (.+)$/gm, '\\item $1');
-        latex = latex.replace(/^- (.+)$/gm, '\\item $1');
-        
-        // Wrap itemize blocks
-        const lines = latex.split('\n');
+        // Step 3: Convert footnotes
+        // Collect footnote definitions (supports multi-line footnotes with indentation)
+        // Supports alphanumeric IDs with hyphens and underscores (e.g., [^my-note], [^note_1])
+        const footnotes: Map<string, string> = new Map();
+        latex = latex.replace(/^\[\^([a-zA-Z0-9\-_]+)\]:\s*(.+(?:\n(?:    |\t).+)*)$/gm, (_, id, text) => {
+            // Remove indentation from multi-line footnotes
+            const cleanedText = text.replace(/\n(?:    |\t)/g, ' ');
+            footnotes.set(id, this.escapeLatex(cleanedText));
+            return '';  // Remove definition from main text
+        });
+
+        // Convert footnote references
+        latex = latex.replace(/\[\^([a-zA-Z0-9\-_]+)\]/g, (_, id) => {
+            const text = footnotes.get(id) || '';
+            return `\\footnote{${text}}`;
+        });
+
+        // Step 4: Convert tables
+        latex = this.convertTables(latex);
+
+        // Step 5: Convert images
+        // ![alt](url "caption") or ![alt](url)
+        latex = latex.replace(/!\[([^\]]*)\]\(([^)"]+)(?:\s+"([^"]+)")?\)/g, (_, alt, url, caption) => {
+            // Clean label: remove non-alphanumeric chars (except hyphens/underscores), collapse multiple hyphens
+            const label = alt.toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/-+/g, '-');
+            // Escape caption and URL for LaTeX special characters
+            const escapedCaption = caption ? this.escapeLatex(caption) : '';
+            const escapedUrl = this.escapeUrl(url);
+            if (caption) {
+                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${escapedUrl}}\n\\caption{${escapedCaption}}\n\\label{fig:${label}}\n\\end{figure}`;
+            } else {
+                return `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{${escapedUrl}}\n\\end{figure}`;
+            }
+        });
+
+        // Step 6: Convert citations [@ref] or [@ref1; @ref2]
+        // Flexible handling of whitespace around semicolons
+        latex = latex.replace(/\[@([^\]]+)\]/g, (_, refs) => {
+            const refList = refs.split(/\s*;\s*/).map((r: string) => r.trim().replace(/^@/, ''));
+            return `\\cite{${refList.join(',')}}`;
+        });
+
+        // Step 7: Convert headings (with special character escaping)
+        latex = latex.replace(/^# (.+)$/gm, (_, heading) => `\\section{${this.escapeLatex(heading)}}`);
+        latex = latex.replace(/^## (.+)$/gm, (_, heading) => `\\subsection{${this.escapeLatex(heading)}}`);
+        latex = latex.replace(/^### (.+)$/gm, (_, heading) => `\\subsubsection{${this.escapeLatex(heading)}}`);
+        latex = latex.replace(/^#### (.+)$/gm, (_, heading) => `\\paragraph{${this.escapeLatex(heading)}}`);
+
+        // Step 8: Convert horizontal rules (before bold/italic to avoid *** being treated as formatting)
+        // Supports ---, ***, ___, and variants with spaces (e.g., * * *, - - -)
+        latex = latex.replace(/^\s*(?:[-*_]\s*){3,}$/gm, '\\hrule');
+
+        // Step 9: Convert bold and italic (with escaping, avoid conflicts with math)
+        latex = latex.replace(/\*\*(.+?)\*\*/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
+        // Use negative lookahead/lookbehind to avoid matching asterisks that are part of bold markers
+        latex = latex.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
+        latex = latex.replace(/__(.+?)__/g, (_, text) => `\\textbf{${this.escapeLatex(text)}}`);
+        latex = latex.replace(/_(.+?)_/g, (_, text) => `\\textit{${this.escapeLatex(text)}}`);
+
+        // Step 10: Convert code blocks with syntax highlighting
+        latex = this.convertCodeBlocks(latex);
+
+        // Step 11: Convert inline code (escape special chars in code)
+        latex = latex.replace(/`(.+?)`/g, (_, code) => `\\texttt{${this.escapeLatex(code)}}`);
+
+        // Step 12: Convert links (escape link text and URL, avoid nested brackets)
+        latex = latex.replace(/\[([^\[\]]+)\]\(([^)]+)\)/g, (_, text, url) => `\\href{${this.escapeUrl(url)}}{${this.escapeLatex(text)}}`);
+
+        // Step 13: Convert lists (both unordered and ordered)
+        // Lists are processed AFTER bold/italic/code/links, so those elements are already converted
+        latex = this.convertLists(latex);
+
+        // Step 14: Convert blockquotes
+        // Blockquotes are processed AFTER bold/italic/code/links, so those elements are already converted
+        latex = this.convertBlockquotes(latex);
+
+        // Step 15: Restore raw LaTeX blocks
+        latexBlocks.forEach((block, index) => {
+            latex = latex.replace(`__LATEX_BLOCK_${index}__`, block);
+        });
+
+        return latex;
+    }
+
+    /**
+     * Convert Markdown tables to LaTeX tabular
+     */
+    private convertTables(markdown: string): string {
+        const lines = markdown.split('\n');
         const result: string[] = [];
-        let inList = false;
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i];
+
+            // Check if this line looks like a table header
+            if (line.includes('|') && i + 1 < lines.length && lines[i + 1].includes('|')) {
+                const headerLine = line;
+                const separatorLine = lines[i + 1];
+
+                // Verify it's a table by checking separator line (supports single-column tables)
+                if (separatorLine.match(/^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/)) {
+                    // Validate column count matches between header and separator
+                    const headerCols = headerLine.split('|').map(col => col.trim()).filter(col => col.length > 0);
+                    const separatorCols = separatorLine.split('|').map(col => col.trim()).filter(col => col.length > 0);
+
+                    if (headerCols.length !== separatorCols.length) {
+                        // Malformed table: skip conversion, push original lines
+                        result.push(headerLine);
+                        result.push(separatorLine);
+                        i += 2;
+                        continue;
+                    }
+
+                    // Parse table
+                    const tableLines: string[] = [headerLine];
+                    let j = i + 2;
+
+                    // Collect all table rows, validate column count
+                    // Use same filtering logic as header to support tables without leading/trailing pipes
+                    while (j < lines.length && lines[j].includes('|')) {
+                        const rowCols = lines[j].split('|').map(col => col.trim()).filter(col => col.length > 0);
+                        // Only include rows with correct column count
+                        if (rowCols.length === headerCols.length) {
+                            tableLines.push(lines[j]);
+                        }
+                        j++;
+                    }
+
+                    // Convert to LaTeX
+                    const latexTable = this.convertTableToLatex(tableLines, separatorLine);
+                    result.push(latexTable);
+
+                    i = j;
+                    continue;
+                }
+            }
+
+            result.push(line);
+            i++;
+        }
+
+        return result.join('\n');
+    }
+
+    /**
+     * Convert a single Markdown table to LaTeX tabular
+     */
+    private convertTableToLatex(tableLines: string[], separatorLine: string): string {
+        // Parse header (with escaping, preserve empty cells)
+        // Use slice(1, -1) to remove leading/trailing empty elements from pipes
+        const header = tableLines[0].split('|').map(cell => this.escapeLatex(cell.trim())).slice(1, -1);
+
+        // Parse alignment from separator line
+        const alignments = separatorLine.split('|').map(cell => cell.trim()).slice(1, -1).map(sep => {
+            if (sep.startsWith(':') && sep.endsWith(':')) return 'c';
+            if (sep.endsWith(':')) return 'r';
+            return 'l';
+        });
+
+        // Parse data rows (with escaping, preserve empty cells)
+        const dataRows = tableLines.slice(1).map(line =>
+            line.split('|').map(cell => this.escapeLatex(cell.trim())).slice(1, -1)
+        );
+
+        // Build LaTeX table
+        const colSpec = alignments.join('|');
+        let latex = `\\begin{table}[h]\n\\centering\n\\begin{tabular}{|${colSpec}|}\n\\hline\n`;
+
+        // Add header
+        latex += header.join(' & ') + ' \\\\\n\\hline\n';
+
+        // Add data rows
+        dataRows.forEach(row => {
+            latex += row.join(' & ') + ' \\\\\n';
+        });
+
+        latex += '\\hline\n\\end{tabular}\n\\end{table}';
+
+        return latex;
+    }
+
+    /**
+     * Convert code blocks with language-specific syntax highlighting
+     * Supports language identifiers with hyphens, plus signs, and hash symbols
+     * (e.g., objective-c, c++, c#, f#, x86-64)
+     */
+    private convertCodeBlocks(markdown: string): string {
+        // Strict pattern: requires newlines after opening and before closing backticks
+        // Supports alphanumeric, hyphens, plus, hash in language identifier
+        return markdown.replace(/```([a-zA-Z0-9_+\-#]+)?\n([\s\S]+?)\n```/g, (_, lang, code) => {
+            if (lang) {
+                // Use listings package for syntax highlighting
+                return `\\begin{lstlisting}[language=${this.mapLanguage(lang)}]\n${code}\\end{lstlisting}`;
+            } else {
+                // Use verbatim for code without language
+                return `\\begin{verbatim}\n${code}\\end{verbatim}`;
+            }
+        });
+    }
+
+    /**
+     * Map common language names to listings package names
+     * Uses static LANGUAGE_MAP to avoid recreating the map on every call
+     */
+    private mapLanguage(lang: string): string {
+        return ExportManager.LANGUAGE_MAP[lang.toLowerCase()] || lang;
+    }
+
+    /**
+     * Convert blockquotes to LaTeX quote environment
+     * This method tracks blockquote state during conversion to avoid the issue
+     * of checking for '>' after it's already been replaced
+     *
+     * Note: Uses standard LaTeX quote environment without itemize, treating
+     * blockquote lines as regular paragraph text (semantically correct)
+     *
+     * IMPORTANT: Blockquotes are processed in Step 14 (after bold/italic/code/links).
+     * Those earlier steps have already converted and escaped their content, so we
+     * do NOT escape here to avoid double-escaping.
+     */
+    private convertBlockquotes(markdown: string): string {
+        const lines = markdown.split('\n');
+        const result: string[] = [];
+        let inQuote = false;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmedLine = line.trim();
-            const isListItem = trimmedLine.startsWith('\\item');
-            const isEmptyLine = trimmedLine === '';
+            const isQuoteLine = trimmedLine.startsWith('>');
 
-            if (isListItem && !inList) {
-                // Starting a new list
-                result.push('\\begin{itemize}');
-                inList = true;
+            if (isQuoteLine && !inQuote) {
+                // Start of blockquote
+                result.push('\\begin{quote}');
+                inQuote = true;
+                // Remove '>' prefix - content is already processed by earlier steps
+                result.push(trimmedLine.substring(1).trim());
+            } else if (isQuoteLine && inQuote) {
+                // Continuation of blockquote - content is already processed
+                result.push(trimmedLine.substring(1).trim());
+            } else if (!isQuoteLine && inQuote && trimmedLine !== '') {
+                // End of blockquote (non-empty, non-quote line)
+                result.push('\\end{quote}');
+                inQuote = false;
                 result.push(line);
-            } else if (!isListItem && !isEmptyLine && inList) {
-                // Ending the list before adding non-list, non-empty line
-                result.push('\\end{itemize}');
-                inList = false;
-                result.push(line);
+            } else if (trimmedLine === '' && inQuote) {
+                // Empty line within blockquote - preserve for paragraph break
+                result.push('');
             } else {
-                // Continue in current state (including empty lines within lists)
+                // Regular line
                 result.push(line);
             }
         }
 
-        // Close any unclosed list at the end
-        if (inList) {
-            result.push('\\end{itemize}');
+        // Close any unclosed blockquote
+        if (inQuote) {
+            result.push('\\end{quote}');
+        }
+
+        return result.join('\n');
+    }
+
+    /**
+     * Convert both ordered and unordered lists
+     * Handles switching between list types (unordered to ordered or vice versa)
+     *
+     * IMPORTANT: Lists are processed in Step 13 (after bold/italic/code/links).
+     * Those earlier steps have already converted and escaped their content, so we
+     * do NOT escape here to avoid double-escaping.
+     */
+    private convertLists(markdown: string): string {
+        const lines = markdown.split('\n');
+        const result: string[] = [];
+        let inList = false;
+        let listType: 'itemize' | 'enumerate' | null = null;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmedLine = line.trim();
+
+            // Check if this is a list item (supports empty list items)
+            const isUnorderedItem = /^[\*\-]\s+(.*)$/.test(trimmedLine);
+            const isOrderedItem = /^\d+\.\s+(.*)$/.test(trimmedLine);
+            const isListItem = isUnorderedItem || isOrderedItem;
+            const isEmptyLine = trimmedLine === '';
+
+            // Determine the current item's list type
+            const currentItemType = isOrderedItem ? 'enumerate' : (isUnorderedItem ? 'itemize' : null);
+
+            if (isListItem && !inList) {
+                // Starting a new list
+                listType = currentItemType;
+                result.push(`\\begin{${listType}}`);
+                inList = true;
+
+                // Extract list item content - already processed by earlier steps
+                if (isUnorderedItem) {
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.*)$/, '$2');
+                    result.push(`\\item ${content}`);
+                } else {
+                    const content = trimmedLine.replace(/^\d+\.\s+(.*)$/, '$1');
+                    result.push(`\\item ${content}`);
+                }
+            } else if (isListItem && inList) {
+                // Check if list type is changing
+                if (currentItemType !== listType) {
+                    // Close current list and start new one
+                    result.push(`\\end{${listType}}`);
+                    listType = currentItemType;
+                    result.push(`\\begin{${listType}}`);
+                }
+
+                // Extract list item content - already processed by earlier steps
+                if (isUnorderedItem) {
+                    const content = trimmedLine.replace(/^([\*\-])\s+(.*)$/, '$2');
+                    result.push(`\\item ${content}`);
+                } else {
+                    const content = trimmedLine.replace(/^\d+\.\s+(.*)$/, '$1');
+                    result.push(`\\item ${content}`);
+                }
+            } else if (!isListItem && !isEmptyLine && inList) {
+                // Ending the list
+                result.push(`\\end{${listType}}`);
+                inList = false;
+                listType = null;
+                result.push(line);
+            } else {
+                // Regular line or empty line
+                result.push(line);
+            }
+        }
+
+        // Close any unclosed list
+        if (inList && listType) {
+            result.push(`\\end{${listType}}`);
         }
 
         return result.join('\n');
