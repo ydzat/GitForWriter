@@ -80,7 +80,21 @@ export async function activate(context: vscode.ExtensionContext) {
     const hasCompletedOnboarding = context.globalState.get(WelcomePanel.ONBOARDING_COMPLETED_KEY, false);
     if (!hasCompletedOnboarding) {
         // Show welcome panel for first-time users
+        // Note: Some features (project initialization, tutorial) require a workspace folder
+        // but users can still configure AI providers without one
         WelcomePanel.createOrShow(context.extensionUri, context, configManager, secretManager);
+
+        // Show a friendly reminder if no workspace is open
+        if (!workspaceFolder) {
+            vscode.window.showInformationMessage(
+                'Welcome to GitForWriter! For the best experience, open a folder to access all features.',
+                'Open Folder'
+            ).then(selection => {
+                if (selection === 'Open Folder') {
+                    vscode.commands.executeCommand('vscode.openFolder');
+                }
+            });
+        }
     }
 
     // Register commands

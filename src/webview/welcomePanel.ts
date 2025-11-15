@@ -234,6 +234,14 @@ export class WelcomePanel {
      */
     private async handleInitializeProject(): Promise<void> {
         try {
+            // Check if workspace folder exists
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('Please open a folder first to initialize a project');
+                this.sendMessage({ command: 'projectInitialized', success: false, error: 'No workspace folder' });
+                return;
+            }
+
             // Execute the start project command
             await vscode.commands.executeCommand('gitforwriter.startProject');
             this.sendMessage({ command: 'projectInitialized', success: true });
@@ -363,7 +371,7 @@ Happy writing! 📝
         const currentStepData = steps[this.currentStep];
 
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -887,7 +895,7 @@ Happy writing! 📝
             </p>
             <div class="input-group">
                 <label for="api-key-input">API Key:</label>
-                <input type="password" id="api-key-input" placeholder="sk-...">
+                <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off">
             </div>
             <button onclick="saveApiKey()">Save API Key</button>
             <div class="info-box">
