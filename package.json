@@ -63,6 +63,18 @@
       {
         "command": "gitforwriter.clearAPIKeys",
         "title": "GitForWriter: Clear API Keys"
+      },
+      {
+        "command": "gitforwriter.viewStatistics",
+        "title": "GitForWriter: View Statistics"
+      },
+      {
+        "command": "gitforwriter.enableStatistics",
+        "title": "GitForWriter: Enable Statistics"
+      },
+      {
+        "command": "gitforwriter.disableStatistics",
+        "title": "GitForWriter: Disable Statistics"
       }
     ],
     "configuration": {

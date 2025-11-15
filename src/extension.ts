@@ -5,11 +5,13 @@ import * as dotenv from 'dotenv';
 import { GitManager } from './utils/gitManager';
 import { StatusBarManager } from './utils/statusBarManager';
 import { AIReviewPanel } from './webview/aiReviewPanel';
+import { StatsPanel } from './webview/statsPanel';
 import { DiffAnalyzer } from './ai/diff/diffAnalyzer';
 import { ReviewEngine } from './ai/review/reviewEngine';
 import { ExportManager } from './ai/export/exportManager';
 import { SecretManager } from './config/secretManager';
 import { ConfigManager } from './config/configManager';
+import { StatsCollector } from './analytics/statsCollector';
 import { errorHandler } from './utils/errorHandlerUI';
 import { GitError } from './utils/errorHandler';
 
@@ -33,6 +35,20 @@ export async function activate(context: vscode.ExtensionContext) {
     const diffAnalyzer = new DiffAnalyzer(configManager, secretManager);
     const reviewEngine = new ReviewEngine(configManager, secretManager);
     const exportManager = new ExportManager();
+
+    // Initialize StatsCollector
+    let statsCollector: StatsCollector | undefined;
+    const previousWordCounts = new Map<string, number>();
+    if (workspaceFolder) {
+        statsCollector = new StatsCollector(workspaceFolder.uri.fsPath);
+    }
+
+    // Cleanup previousWordCounts when documents are closed to prevent memory leaks
+    context.subscriptions.push(
+        vscode.workspace.onDidCloseTextDocument((doc) => {
+            previousWordCounts.delete(doc.fileName);
+        })
+    );
 
     // Initialize error handler
     if (workspaceFolder) {
@@ -87,9 +103,32 @@ export async function activate(context: vscode.ExtensionContext) {
         await clearAPIKeys(secretManager);
     });
 
+    // Statistics commands
+    const viewStatsCommand = vscode.commands.registerCommand('gitforwriter.viewStatistics', async () => {
+        if (statsCollector) {
+            StatsPanel.createOrShow(statsCollector);
+        } else {
+            vscode.window.showErrorMessage('No workspace folder open');
+        }
+    });
+
+    const enableStatsCommand = vscode.commands.registerCommand('gitforwriter.enableStatistics', async () => {
+        if (statsCollector) {
+            statsCollector.enable();
+            vscode.window.showInformationMessage('Writing statistics enabled');
+        }
+    });
+
+    const disableStatsCommand = vscode.commands.registerCommand('gitforwriter.disableStatistics', async () => {
+        if (statsCollector) {
+            statsCollector.disable();
+            vscode.window.showInformationMessage('Writing statistics disabled');
+        }
+    });
+
     // Register document save handler
     const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
-        await handleDocumentSave(document, gitManager, diffAnalyzer);
+        await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector, previousWordCounts);
     });
 
     context.subscriptions.push(
@@ -100,12 +139,24 @@ export async function activate(context: vscode.ExtensionContext) {
         setOpenAIKeyCommand,
         setClaudeKeyCommand,
         clearKeysCommand,
+        viewStatsCommand,
+        enableStatsCommand,
+        disableStatsCommand,
         saveHandler,
         statusBarManager
     );
 
     // Initialize status bar
     statusBarManager.updateStage('ideation');
+
+    // Store statsCollector for cleanup
+    context.subscriptions.push({
+        dispose: () => {
+            if (statsCollector) {
+                statsCollector.dispose();
+            }
+        }
+    });
 }
 
 async function startWritingProject(gitManager: GitManager, statusBarManager: StatusBarManager) {
@@ -215,7 +266,9 @@ async function exportDraft(exportManager: ExportManager) {
 async function handleDocumentSave(
     document: vscode.TextDocument,
     gitManager: GitManager,
-    diffAnalyzer: DiffAnalyzer
+    diffAnalyzer: DiffAnalyzer,
+    statsCollector: StatsCollector | undefined,
+    previousWordCounts: Map<string, number>
 ) {
     // Only process Markdown and LaTeX files
     if (!['markdown', 'latex'].includes(document.languageId)) {
@@ -230,6 +283,18 @@ async function handleDocumentSave(
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         return;
+    }
+
+    // Collect writing statistics
+    if (statsCollector && statsCollector.isEnabled()) {
+        const text = document.getText();
+        const wordCount = StatsCollector.countWords(text);
+
+        // Get previous word count from persistent map
+        const previousWordCount = previousWordCounts.get(document.fileName) || 0;
+        previousWordCounts.set(document.fileName, wordCount);
+
+        statsCollector.recordWordsWritten(document.fileName, wordCount, previousWordCount);
     }
 
     try {
