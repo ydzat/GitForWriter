@@ -42,7 +42,7 @@ jobs:
       run: npx tsc --noEmit
     
     - name: Run tests
-      run: npm run compile && npm run test:unit
+      run: npm run compile && npm run test:unit:compiled
     
     - name: Generate coverage report
       if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
