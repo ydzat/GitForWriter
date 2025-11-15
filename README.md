@@ -1,5 +1,10 @@
 # GitForWriter
 
+[![CI](https://github.com/ydzat/GitForWriter/actions/workflows/ci.yml/badge.svg)](https://github.com/ydzat/GitForWriter/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ydzat/GitForWriter/branch/main/graph/badge.svg)](https://codecov.io/gh/ydzat/GitForWriter)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/visual-studio-marketplace/v/ydzat.gitforwriter)](https://marketplace.visualstudio.com/items?itemName=ydzat.gitforwriter)
+
 **让文学创作具备软件开发的流程化特征**
 
 GitForWriter 是一个 VSCode 插件，旨在探索 AI 与版本控制在创作流程中的融合，使写作过程具备工业级可控性与智能化特征。它为 Markdown 与 LaTeX 写作提供版本管理、AI 审校与自动化发布功能，让写作像 Git 工程一样可回溯、可对比、可发布。
