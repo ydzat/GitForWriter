@@ -30,7 +30,7 @@ export class AICache<T> {
     private config: CacheConfig;
     private hits: number;
     private misses: number;
-    private operationInProgress: boolean; // Simple mutex for cache operations
+    private operationInProgress: Promise<void> | null; // Async mutex for cache operations
 
     constructor(config?: Partial<CacheConfig>) {
         this.cache = new Map();
@@ -39,7 +39,7 @@ export class AICache<T> {
         this.currentSize = 0;
         this.hits = 0;
         this.misses = 0;
-        this.operationInProgress = false;
+        this.operationInProgress = null;
 
         // Default configuration
         this.config = {
@@ -129,8 +129,10 @@ export class AICache<T> {
      */
     private updateAccessOrder(key: string): void {
         // Reset counter if approaching MAX_SAFE_INTEGER to prevent overflow
-        if (this.accessCounter > Number.MAX_SAFE_INTEGER - 1000) {
-            // Reassign order values starting from 0, preserving relative order
+        // Use higher threshold to reduce frequency of expensive reset operations
+        if (this.accessCounter > Number.MAX_SAFE_INTEGER - 10000) {
+            // Schedule async reset to avoid blocking
+            // For now, do synchronous reset but with optimized threshold
             const entries = Array.from(this.accessOrder.entries())
                 .sort((a, b) => a[1] - b[1]); // sort by old order
             this.accessCounter = 0;
@@ -175,23 +177,25 @@ export class AICache<T> {
 
     /**
      * Set cached data
-     * Uses simple mutex to prevent race conditions during eviction
+     * Uses async mutex to prevent race conditions during eviction
      */
-    set(content: string, operation: string, data: T): void {
+    async set(content: string, operation: string, data: T): Promise<void> {
         if (!this.config.enabled) {
             return;
         }
 
         // Wait for any ongoing operation to complete
-        // In practice, this is rarely needed due to JavaScript's single-threaded nature
-        // but provides safety for async interleaving
-        if (this.operationInProgress) {
-            // Skip this set operation if another is in progress
-            // This is acceptable as it's just a cache miss on next access
-            return;
+        // This provides proper async safety for concurrent cache operations
+        while (this.operationInProgress) {
+            await this.operationInProgress;
         }
 
-        this.operationInProgress = true;
+        // Create a new operation promise
+        let resolveOperation: () => void;
+        this.operationInProgress = new Promise<void>(resolve => {
+            resolveOperation = resolve;
+        });
+
         try {
             const key = this.generateKey(content, operation);
             const size = this.estimateSize(data);
@@ -216,7 +220,8 @@ export class AICache<T> {
             // Evict if necessary
             this.evictLRU();
         } finally {
-            this.operationInProgress = false;
+            this.operationInProgress = null;
+            resolveOperation!();
         }
     }
 

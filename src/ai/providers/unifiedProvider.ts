@@ -111,8 +111,32 @@ export class UnifiedProvider implements AIProvider {
     private generateCacheKey(content: string, metadata: any): string {
         // Combine content with metadata separator to avoid collisions
         // AICache.generateKey will hash this entire string along with the operation type
-        const metadataStr = metadata ? JSON.stringify(metadata) : '';
+        // Use deterministic JSON serialization to ensure consistent cache keys
+        const metadataStr = metadata ? this.stringifyDeterministic(metadata) : '';
         return `${content}\n---METADATA---\n${metadataStr}`;
+    }
+
+    /**
+     * Deterministic JSON stringification with sorted keys
+     * Ensures consistent cache keys for objects with same properties in different orders
+     */
+    private stringifyDeterministic(obj: any): string {
+        if (obj === null || obj === undefined) {
+            return JSON.stringify(obj);
+        }
+        if (typeof obj !== 'object') {
+            return JSON.stringify(obj);
+        }
+        if (Array.isArray(obj)) {
+            return '[' + obj.map(item => this.stringifyDeterministic(item)).join(',') + ']';
+        }
+        // Sort object keys for deterministic output
+        const sortedKeys = Object.keys(obj).sort();
+        const pairs = sortedKeys.map(key => {
+            const value = this.stringifyDeterministic(obj[key]);
+            return `"${key}":${value}`;
+        });
+        return '{' + pairs.join(',') + '}';
     }
 
     /**
@@ -167,8 +191,10 @@ export class UnifiedProvider implements AIProvider {
             const response = await this.callAI(prompt, 'diff-analysis');
             const analysis = this.parseDiffAnalysis(response.content, diff);
 
-            // Cache the result
-            this.diffCache.set(cacheKey, 'diff-analysis', analysis);
+            // Cache the result (async, but don't wait)
+            this.diffCache.set(cacheKey, 'diff-analysis', analysis).catch(() => {
+                // Ignore cache errors - they shouldn't affect the main operation
+            });
 
             return {
                 data: analysis,
@@ -206,8 +232,10 @@ export class UnifiedProvider implements AIProvider {
             const response = await this.callAI(prompt, 'text-review');
             const review = this.parseTextReview(response.content);
 
-            // Cache the result
-            this.reviewCache.set(cacheKey, 'text-review', review);
+            // Cache the result (async, but don't wait)
+            this.reviewCache.set(cacheKey, 'text-review', review).catch(() => {
+                // Ignore cache errors - they shouldn't affect the main operation
+            });
 
             return {
                 data: review,
@@ -245,8 +273,10 @@ export class UnifiedProvider implements AIProvider {
             const response = await this.callAI(prompt, 'generate-suggestions');
             const suggestions = this.parseSuggestions(response.content);
 
-            // Cache the result
-            this.suggestionsCache.set(cacheKey, 'generate-suggestions', suggestions);
+            // Cache the result (async, but don't wait)
+            this.suggestionsCache.set(cacheKey, 'generate-suggestions', suggestions).catch(() => {
+                // Ignore cache errors - they shouldn't affect the main operation
+            });
 
             return {
                 data: suggestions,

@@ -166,25 +166,51 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Get debounce delay from configuration
     const config = vscode.workspace.getConfiguration('gitforwriter');
-    const debounceDelay = config.get<number>('performance.debounceDelay', 2000);
+    let debounceDelay = config.get<number>('performance.debounceDelay', 2000);
 
     // Create debounced document save handler
-    const debouncedHandleDocumentSave = debounce(
+    let debouncedHandleDocumentSave = debounce(
         async (document: vscode.TextDocument) => {
             await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector, previousWordCounts, performanceMonitor);
         },
         debounceDelay
     );
 
+    // Listen for configuration changes to update debounce delay
+    const configChangeListener = vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('gitforwriter.performance.debounceDelay')) {
+            const newConfig = vscode.workspace.getConfiguration('gitforwriter');
+            const newDelay = newConfig.get<number>('performance.debounceDelay', 2000);
+            if (newDelay !== debounceDelay) {
+                debounceDelay = newDelay;
+                // Recreate debounced handler with new delay
+                debouncedHandleDocumentSave = debounce(
+                    async (document: vscode.TextDocument) => {
+                        await handleDocumentSave(document, gitManager, diffAnalyzer, statsCollector, previousWordCounts, performanceMonitor);
+                    },
+                    debounceDelay
+                );
+            }
+        }
+    });
+
     // Register document save handler with debouncing
     const saveHandler = vscode.workspace.onDidSaveTextDocument(async (document) => {
-        // Show analyzing indicator until analysis completes
-        const statusBarDisposable = vscode.window.setStatusBarMessage('$(sync~spin) Analyzing changes...');
+        // Show queued indicator (actual analysis starts after debounce delay)
+        const statusBarDisposable = vscode.window.setStatusBarMessage(
+            debounceDelay > 0
+                ? '$(clock) Queued for analysis...'
+                : '$(sync~spin) Analyzing changes...'
+        );
         try {
             await debouncedHandleDocumentSave(document);
         } catch (err) {
             // Error handling is done inside handleDocumentSave
-            // This catch prevents unhandled promise rejections
+            // Log unexpected errors for debugging
+            if (err) {
+                console.error('Unexpected error in document save handler:', err);
+                vscode.window.showErrorMessage('An unexpected error occurred during document analysis. See console for details.');
+            }
         } finally {
             statusBarDisposable.dispose();
         }
@@ -203,6 +229,7 @@ export async function activate(context: vscode.ExtensionContext) {
         disableStatsCommand,
         viewPerformanceCommand,
         clearCacheCommand,
+        configChangeListener,
         saveHandler,
         statusBarManager
     );

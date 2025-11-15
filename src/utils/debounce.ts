@@ -27,9 +27,11 @@ export function debounce<T extends (...args: any[]) => any>(
 ): DebouncedFunction<T> {
     let timeoutId: NodeJS.Timeout | null = null;
     let lastArgs: Parameters<T> | null = null;
+    let lastContext: any = null;
 
     const debounced = function (this: any, ...args: Parameters<T>) {
         lastArgs = args;
+        lastContext = this;
 
         // Clear existing timeout
         if (timeoutId !== null) {
@@ -38,9 +40,10 @@ export function debounce<T extends (...args: any[]) => any>(
 
         // Set new timeout
         timeoutId = setTimeout(() => {
-            func.apply(this, args);
+            func.apply(lastContext, args);
             timeoutId = null;
             lastArgs = null;
+            lastContext = null;
         }, wait);
     } as DebouncedFunction<T>;
 
@@ -50,17 +53,19 @@ export function debounce<T extends (...args: any[]) => any>(
             clearTimeout(timeoutId);
             timeoutId = null;
             lastArgs = null;
+            lastContext = null;
         }
     };
 
-    // Execute immediately with last arguments
-    debounced.flush = function (this: any) {
+    // Execute immediately with last arguments and context
+    debounced.flush = function () {
         if (timeoutId !== null) {
             clearTimeout(timeoutId);
             timeoutId = null;
-            if (lastArgs !== null) {
-                func.apply(this, lastArgs);
+            if (lastArgs !== null && lastContext !== null) {
+                func.apply(lastContext, lastArgs);
                 lastArgs = null;
+                lastContext = null;
             }
         }
     };
