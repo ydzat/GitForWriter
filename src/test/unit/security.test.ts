@@ -243,6 +243,42 @@ describe('Security Test Suite', () => {
             assert.ok(!logContent.includes('sk-1234567890'));
             assert.ok(logContent.includes('***REDACTED***'));
         });
+
+        it('Should handle circular references in context object', () => {
+            const error = new Error('API call failed');
+            const circularContext: any = { data: 'test' };
+            circularContext.self = circularContext;
+
+            // Should not throw error, should handle gracefully
+            assert.doesNotThrow(() => {
+                logger.log(error, circularContext);
+            });
+
+            const logFile = path.join(tempDir, '.gitforwriter', 'error.log');
+            const logContent = fs.readFileSync(logFile, 'utf-8');
+            assert.ok(logContent.includes('[Circular Reference]'));
+        });
+
+        it('Should handle deeply nested objects', () => {
+            const error = new Error('API call failed');
+            let deepContext: any = { level: 0 };
+            let current = deepContext;
+
+            // Create 15 levels of nesting (exceeds max depth of 10)
+            for (let i = 1; i < 15; i++) {
+                current.nested = { level: i };
+                current = current.nested;
+            }
+
+            // Should not throw error, should handle gracefully
+            assert.doesNotThrow(() => {
+                logger.log(error, deepContext);
+            });
+
+            const logFile = path.join(tempDir, '.gitforwriter', 'error.log');
+            const logContent = fs.readFileSync(logFile, 'utf-8');
+            assert.ok(logContent.includes('[Max Depth Exceeded]'));
+        });
     });
 
     describe('AI Response Validation', () => {
@@ -258,16 +294,121 @@ describe('Security Test Suite', () => {
             }, /null or undefined/);
         });
 
-        it('Should reject AI response that is too large', () => {
-            const largeResponse = { data: 'x'.repeat(11 * 1024 * 1024) }; // 11MB
+        it('Should reject AI response with circular reference', () => {
+            const circularResponse: any = { data: 'test' };
+            circularResponse.self = circularResponse;
+            assert.throws(() => {
+                InputValidator.validateAIResponse(circularResponse);
+            }, /circular reference detected/);
+        });
+
+        it('Should reject AI response with too large text field', () => {
+            const largeResponse = { text: 'x'.repeat(11 * 1024 * 1024) }; // 11MB text field
             assert.throws(() => {
                 InputValidator.validateAIResponse(largeResponse);
-            }, /response too large/);
+            }, /text field too large/);
+        });
+
+        it('Should reject AI response with too large content field', () => {
+            const largeResponse = { content: 'x'.repeat(11 * 1024 * 1024) }; // 11MB content field
+            assert.throws(() => {
+                InputValidator.validateAIResponse(largeResponse);
+            }, /content field too large/);
+        });
+
+        it('Should reject AI response with too large choice text', () => {
+            const largeResponse = {
+                choices: [
+                    { text: 'x'.repeat(11 * 1024 * 1024) }
+                ]
+            };
+            assert.throws(() => {
+                InputValidator.validateAIResponse(largeResponse);
+            }, /choice text too large/);
+        });
+
+        it('Should reject AI response with too large choice message content', () => {
+            const largeResponse = {
+                choices: [
+                    { message: { content: 'x'.repeat(11 * 1024 * 1024) } }
+                ]
+            };
+            assert.throws(() => {
+                InputValidator.validateAIResponse(largeResponse);
+            }, /choice message content too large/);
         });
 
         it('Should accept valid AI response', () => {
             const response = { data: 'Valid response', tokenUsage: { total: 100 } };
             assert.ok(InputValidator.validateAIResponse(response));
+        });
+
+        it('Should accept AI response with reasonable text field', () => {
+            const response = { text: 'x'.repeat(1024 * 1024) }; // 1MB is OK
+            assert.ok(InputValidator.validateAIResponse(response));
+        });
+
+        it('Should accept AI response with choices array', () => {
+            const response = {
+                choices: [
+                    { message: { content: 'Valid response' } }
+                ]
+            };
+            assert.ok(InputValidator.validateAIResponse(response));
+        });
+    });
+
+    describe('Config Value Validation', () => {
+        it('Should validate string type correctly', () => {
+            assert.ok(InputValidator.validateConfigValue('test', 'string'));
+        });
+
+        it('Should validate number type correctly', () => {
+            assert.ok(InputValidator.validateConfigValue(123, 'number'));
+        });
+
+        it('Should validate boolean type correctly', () => {
+            assert.ok(InputValidator.validateConfigValue(true, 'boolean'));
+        });
+
+        it('Should validate array type correctly', () => {
+            assert.ok(InputValidator.validateConfigValue([1, 2, 3], 'array'));
+        });
+
+        it('Should validate object type correctly', () => {
+            assert.ok(InputValidator.validateConfigValue({ key: 'value' }, 'object'));
+        });
+
+        it('Should validate null type correctly', () => {
+            assert.ok(InputValidator.validateConfigValue(null, 'null'));
+        });
+
+        it('Should reject array when expecting object', () => {
+            assert.throws(() => {
+                InputValidator.validateConfigValue([1, 2, 3], 'object');
+            }, /expected object, got array/);
+        });
+
+        it('Should reject null when expecting object', () => {
+            assert.throws(() => {
+                InputValidator.validateConfigValue(null, 'object');
+            }, /expected object, got null/);
+        });
+
+        it('Should reject string when expecting number', () => {
+            assert.throws(() => {
+                InputValidator.validateConfigValue('123', 'number');
+            }, /expected number, got string/);
+        });
+
+        it('Should validate allowed values', () => {
+            assert.ok(InputValidator.validateConfigValue('option1', 'string', ['option1', 'option2']));
+        });
+
+        it('Should reject value not in allowed values', () => {
+            assert.throws(() => {
+                InputValidator.validateConfigValue('option3', 'string', ['option1', 'option2']);
+            }, /must be one of option1, option2/);
         });
     });
 });

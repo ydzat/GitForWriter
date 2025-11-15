@@ -283,8 +283,14 @@ export class ErrorLogger {
     /**
      * Sanitize sensitive data from strings
      * Masks API keys and other sensitive information
+     * Includes protection against circular references and deep nesting
      */
-    private sanitizeSensitiveData(data: any): any {
+    private sanitizeSensitiveData(data: any, depth: number = 0, visited: WeakSet<any> = new WeakSet()): any {
+        // Prevent stack overflow on deeply nested objects
+        if (depth > 10) {
+            return '[Max Depth Exceeded]';
+        }
+
         if (typeof data === 'string') {
             // Mask OpenAI API keys (sk-...)
             data = data.replace(/sk-[a-zA-Z0-9]{20,}/g, 'sk-***REDACTED***');
@@ -296,15 +302,26 @@ export class ErrorLogger {
             data = data.replace(/bearer\s+[a-zA-Z0-9_-]{20,}/gi, 'bearer ***REDACTED***');
             return data;
         } else if (Array.isArray(data)) {
-            return data.map(item => this.sanitizeSensitiveData(item));
+            // Check for circular reference
+            if (visited.has(data)) {
+                return '[Circular Reference]';
+            }
+            visited.add(data);
+            return data.map(item => this.sanitizeSensitiveData(item, depth + 1, visited));
         } else if (typeof data === 'object' && data !== null) {
+            // Check for circular reference
+            if (visited.has(data)) {
+                return '[Circular Reference]';
+            }
+            visited.add(data);
+
             const sanitized: any = {};
             for (const key in data) {
                 // Skip sensitive keys entirely
                 if (/api[_-]?key|secret|password|token|authorization/i.test(key)) {
                     sanitized[key] = '***REDACTED***';
                 } else {
-                    sanitized[key] = this.sanitizeSensitiveData(data[key]);
+                    sanitized[key] = this.sanitizeSensitiveData(data[key], depth + 1, visited);
                 }
             }
             return sanitized;

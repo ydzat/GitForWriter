@@ -155,11 +155,50 @@ export class InputValidator {
             throw new Error('Invalid AI response: response is null or undefined');
         }
 
-        // Check for reasonable size (prevent memory exhaustion)
-        const responseStr = JSON.stringify(response);
-        const maxSize = 10 * 1024 * 1024; // 10MB
-        if (responseStr.length > maxSize) {
-            throw new Error('Invalid AI response: response too large');
+        // Check for circular references (prevent JSON.stringify from throwing)
+        function hasCircular(obj: any, seen: WeakSet<any> = new WeakSet()): boolean {
+            if (obj && typeof obj === 'object') {
+                if (seen.has(obj)) {
+                    return true;
+                }
+                seen.add(obj);
+                for (const key in obj) {
+                    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                        if (hasCircular(obj[key], seen)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        if (hasCircular(response)) {
+            throw new Error('Invalid AI response: circular reference detected');
+        }
+
+        // Check key fields for reasonable size (prevent memory exhaustion)
+        const maxFieldSize = 10 * 1024 * 1024; // 10MB per field
+
+        // Check common response fields
+        if (typeof response.text === 'string' && response.text.length > maxFieldSize) {
+            throw new Error('Invalid AI response: text field too large');
+        }
+
+        if (typeof response.content === 'string' && response.content.length > maxFieldSize) {
+            throw new Error('Invalid AI response: content field too large');
+        }
+
+        // Check choices array (OpenAI format)
+        if (Array.isArray(response.choices)) {
+            for (const choice of response.choices) {
+                if (choice && typeof choice.text === 'string' && choice.text.length > maxFieldSize) {
+                    throw new Error('Invalid AI response: choice text too large');
+                }
+                if (choice && choice.message && typeof choice.message.content === 'string' && choice.message.content.length > maxFieldSize) {
+                    throw new Error('Invalid AI response: choice message content too large');
+                }
+            }
         }
 
         return true;
@@ -199,15 +238,25 @@ export class InputValidator {
     /**
      * Validate configuration value
      * @param value The value to validate
-     * @param type Expected type
+     * @param type Expected type ('string', 'number', 'boolean', 'object', 'array', 'null')
      * @param allowedValues Optional array of allowed values
      * @returns True if valid
      * @throws Error if value is invalid
      */
     static validateConfigValue(value: any, type: string, allowedValues?: any[]): boolean {
-        // Type check
-        if (typeof value !== type) {
-            throw new Error(`Invalid config value: expected ${type}, got ${typeof value}`);
+        // Type check with proper handling for array, null, and object
+        let actualType: string;
+
+        if (value === null) {
+            actualType = 'null';
+        } else if (Array.isArray(value)) {
+            actualType = 'array';
+        } else {
+            actualType = typeof value;
+        }
+
+        if (actualType !== type) {
+            throw new Error(`Invalid config value: expected ${type}, got ${actualType}`);
         }
 
         // Check allowed values if provided
