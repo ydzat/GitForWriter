@@ -2,6 +2,7 @@ import simpleGit, { SimpleGit } from 'simple-git';
 import * as path from 'path';
 import * as fs from 'fs';
 import { GitError } from './errorHandler';
+import { InputValidator } from './inputValidator';
 
 export class GitManager {
     private git: SimpleGit | null = null;
@@ -37,8 +38,11 @@ export class GitManager {
         }
 
         try {
+            // Validate file path to prevent path traversal
+            const validatedPath = InputValidator.validateFilePath(filePath, this.workspaceRoot);
+
             // Convert to POSIX path for git (use forward slashes even on Windows)
-            const relativePath = path.relative(this.workspaceRoot, filePath).split(path.sep).join('/');
+            const relativePath = path.relative(this.workspaceRoot, validatedPath).split(path.sep).join('/');
 
             // Check diff cache
             const now = Date.now();
@@ -85,8 +89,11 @@ export class GitManager {
         }
 
         try {
+            // Validate commit message
+            const validatedMessage = InputValidator.validateCommitMessage(message);
+
             await this.git.add('.');
-            await this.git.commit(message);
+            await this.git.commit(validatedMessage);
 
             // Clear diff cache after commit
             this.diffCache.clear();
@@ -128,8 +135,11 @@ export class GitManager {
         }
 
         try {
+            // Validate file path to prevent path traversal
+            const validatedPath = InputValidator.validateFilePath(filePath, this.workspaceRoot);
+
             // Convert to POSIX path for git (use forward slashes even on Windows)
-            const relativePath = path.relative(this.workspaceRoot, filePath).split(path.sep).join('/');
+            const relativePath = path.relative(this.workspaceRoot, validatedPath).split(path.sep).join('/');
             const log = await this.git.log({ file: relativePath, maxCount: limit });
             return log.all.map(entry => ({
                 hash: entry.hash,

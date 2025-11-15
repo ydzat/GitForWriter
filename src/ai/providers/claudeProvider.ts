@@ -11,6 +11,7 @@ import {
     ReviewContext,
     TokenUsage
 } from './aiProvider';
+import { InputValidator } from '../../utils/inputValidator';
 
 /**
  * Claude provider configuration
@@ -80,6 +81,10 @@ export class ClaudeProvider implements AIProvider {
 
         try {
             const response = await this.callClaude(prompt, 'diff-analysis');
+
+            // Validate AI response
+            InputValidator.validateAIResponse(response);
+
             const analysis = this.parseDiffAnalysis(response.content, diff);
 
             return {

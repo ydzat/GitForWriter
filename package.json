@@ -300,5 +300,8 @@
     "simple-git": "^3.19.0",
     "uuid": "^9.0.1"
   },
+  "overrides": {
+    "js-yaml": "^4.1.1"
+  },
   "license": "MIT"
 }

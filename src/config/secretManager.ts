@@ -103,5 +103,39 @@ export class SecretManager {
         }
         return false;
     }
+
+    /**
+     * Mask an API key for display purposes
+     * Shows only the last 4 characters, masks the rest
+     * @param apiKey The API key to mask
+     * @returns Masked API key (e.g., "sk-...xyz")
+     */
+    static maskApiKey(apiKey: string): string {
+        if (!apiKey || apiKey.length < 8) {
+            return '***';
+        }
+        const lastFour = apiKey.slice(-4);
+        const prefix = apiKey.startsWith('sk-ant-') ? 'sk-ant-' :
+                      apiKey.startsWith('sk-') ? 'sk-' : '';
+        return `${prefix}...${lastFour}`;
+    }
+
+    /**
+     * Get masked version of stored OpenAI API key for display
+     * @returns Masked API key or undefined if not set
+     */
+    async getMaskedOpenAIKey(): Promise<string | undefined> {
+        const key = await this.getOpenAIKey();
+        return key ? SecretManager.maskApiKey(key) : undefined;
+    }
+
+    /**
+     * Get masked version of stored Claude API key for display
+     * @returns Masked API key or undefined if not set
+     */
+    async getMaskedClaudeKey(): Promise<string | undefined> {
+        const key = await this.getClaudeKey();
+        return key ? SecretManager.maskApiKey(key) : undefined;
+    }
 }
 

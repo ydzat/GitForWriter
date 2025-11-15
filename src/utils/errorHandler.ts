@@ -281,20 +281,58 @@ export class ErrorLogger {
     }
 
     /**
+     * Sanitize sensitive data from strings
+     * Masks API keys and other sensitive information
+     */
+    private sanitizeSensitiveData(data: any): any {
+        if (typeof data === 'string') {
+            // Mask OpenAI API keys (sk-...)
+            data = data.replace(/sk-[a-zA-Z0-9]{20,}/g, 'sk-***REDACTED***');
+            // Mask Claude API keys (sk-ant-...)
+            data = data.replace(/sk-ant-[a-zA-Z0-9_-]{20,}/g, 'sk-ant-***REDACTED***');
+            // Mask generic API keys
+            data = data.replace(/api[_-]?key["\s:=]+[a-zA-Z0-9_-]{20,}/gi, 'api_key=***REDACTED***');
+            // Mask bearer tokens
+            data = data.replace(/bearer\s+[a-zA-Z0-9_-]{20,}/gi, 'bearer ***REDACTED***');
+            return data;
+        } else if (Array.isArray(data)) {
+            return data.map(item => this.sanitizeSensitiveData(item));
+        } else if (typeof data === 'object' && data !== null) {
+            const sanitized: any = {};
+            for (const key in data) {
+                // Skip sensitive keys entirely
+                if (/api[_-]?key|secret|password|token|authorization/i.test(key)) {
+                    sanitized[key] = '***REDACTED***';
+                } else {
+                    sanitized[key] = this.sanitizeSensitiveData(data[key]);
+                }
+            }
+            return sanitized;
+        }
+        return data;
+    }
+
+    /**
      * Log an error
      */
     log(error: Error | GitForWriterError, context?: Record<string, any>): void {
         this.rotateLogsIfNeeded();
 
         const timestamp = new Date().toISOString();
+
+        // Sanitize error message and stack trace
+        const sanitizedMessage = this.sanitizeSensitiveData(error.message);
+        const sanitizedStack = this.sanitizeSensitiveData(error.stack);
+        const sanitizedContext = this.sanitizeSensitiveData(context || (error as GitForWriterError).context);
+
         const logEntry = {
             timestamp,
             name: error.name,
-            message: error.message,
+            message: sanitizedMessage,
             code: (error as GitForWriterError).code,
             severity: (error as GitForWriterError).severity,
-            stack: error.stack,
-            context: context || (error as GitForWriterError).context
+            stack: sanitizedStack,
+            context: sanitizedContext
         };
 
         const logLine = JSON.stringify(logEntry) + '\n';

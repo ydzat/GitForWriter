@@ -11,6 +11,7 @@ import {
     ReviewContext,
     TokenUsage
 } from './aiProvider';
+import { InputValidator } from '../../utils/inputValidator';
 
 /**
  * OpenAI provider configuration
@@ -82,6 +83,10 @@ export class OpenAIProvider implements AIProvider {
 
         try {
             const response = await this.callOpenAI(prompt, 'diff-analysis');
+
+            // Validate AI response
+            InputValidator.validateAIResponse(response);
+
             const analysis = this.parseDiffAnalysis(response.content, diff);
 
             return {

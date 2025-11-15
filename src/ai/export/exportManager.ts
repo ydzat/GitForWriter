@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ExportError } from '../../utils/errorHandler';
+import { InputValidator } from '../../utils/inputValidator';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -773,6 +774,18 @@ ${content}
 
         const workDir = path.dirname(texPath);
         const texFileName = path.basename(texPath);
+
+        // Validate filename to prevent command injection
+        try {
+            InputValidator.validateLatexFilename(texFileName);
+        } catch (error: any) {
+            throw new ExportError(
+                `Invalid LaTeX filename: ${error.message}`,
+                'INVALID_FILENAME',
+                error,
+                { texFileName }
+            );
+        }
 
         // Show progress
         await vscode.window.withProgress(
