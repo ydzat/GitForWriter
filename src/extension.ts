@@ -6,6 +6,7 @@ import { GitManager } from './utils/gitManager';
 import { StatusBarManager } from './utils/statusBarManager';
 import { AIReviewPanel } from './webview/aiReviewPanel';
 import { StatsPanel } from './webview/statsPanel';
+import { WelcomePanel } from './webview/welcomePanel';
 import { DiffAnalyzer } from './ai/diff/diffAnalyzer';
 import { ReviewEngine } from './ai/review/reviewEngine';
 import { ExportManager } from './ai/export/exportManager';
@@ -72,6 +73,27 @@ export async function activate(context: vscode.ExtensionContext) {
                 error
             );
             await errorHandler.handle(gitError);
+        }
+    }
+
+    // Check if this is the first time the extension is activated
+    const hasCompletedOnboarding = context.globalState.get(WelcomePanel.ONBOARDING_COMPLETED_KEY, false);
+    if (!hasCompletedOnboarding) {
+        // Show welcome panel for first-time users
+        // Note: Some features (project initialization, tutorial) require a workspace folder
+        // but users can still configure AI providers without one
+        WelcomePanel.createOrShow(context.extensionUri, context, configManager, secretManager);
+
+        // Show a friendly reminder if no workspace is open
+        if (!workspaceFolder) {
+            vscode.window.showInformationMessage(
+                'Welcome to GitForWriter! For the best experience, open a folder to access all features.',
+                'Open Folder'
+            ).then(selection => {
+                if (selection === 'Open Folder') {
+                    vscode.commands.executeCommand('vscode.openFolder');
+                }
+            });
         }
     }
 
@@ -153,6 +175,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(message, { modal: true });
     });
 
+    // Getting Started command (re-open welcome panel)
+    const gettingStartedCommand = vscode.commands.registerCommand('gitforwriter.gettingStarted', async () => {
+        WelcomePanel.createOrShow(context.extensionUri, context, configManager, secretManager);
+    });
+
     // Clear cache command
     const clearCacheCommand = vscode.commands.registerCommand('gitforwriter.clearCache', async () => {
         // Clear cache via DiffAnalyzer
@@ -229,6 +256,7 @@ export async function activate(context: vscode.ExtensionContext) {
         disableStatsCommand,
         viewPerformanceCommand,
         clearCacheCommand,
+        gettingStartedCommand,
         configChangeListener,
         saveHandler,
         statusBarManager
