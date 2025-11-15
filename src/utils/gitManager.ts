@@ -36,7 +36,8 @@ export class GitManager {
 
         try {
             // Get diff against HEAD
-            const relativePath = path.relative(this.workspaceRoot, filePath);
+            // Convert to POSIX path for git (use forward slashes even on Windows)
+            const relativePath = path.relative(this.workspaceRoot, filePath).split(path.sep).join('/');
             const diff = await this.git.diff(['HEAD', '--', relativePath]);
 
             if (!diff) {
@@ -92,7 +93,8 @@ export class GitManager {
         }
 
         try {
-            const relativePath = path.relative(this.workspaceRoot, filePath);
+            // Convert to POSIX path for git (use forward slashes even on Windows)
+            const relativePath = path.relative(this.workspaceRoot, filePath).split(path.sep).join('/');
             const log = await this.git.log({ file: relativePath, maxCount: limit });
             return log.all.map(entry => ({
                 hash: entry.hash,
