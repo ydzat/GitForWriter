@@ -88,7 +88,11 @@ export class InputValidator {
     /**
      * Validate a URL to prevent injection attacks
      * Accepts http/https URLs including localhost, IP addresses, and custom ports
-     * Note: URLs with user credentials (user:pass@host) are allowed but may pose security risks
+     *
+     * Security Warning: URLs with embedded credentials (user:pass@host) are technically valid
+     * but pose security risks as they can be logged, exposed in error messages, or leaked
+     * through referrer headers. Consider using separate authentication mechanisms instead.
+     *
      * @param url The URL to validate
      * @returns True if valid
      * @throws Error if URL is invalid
@@ -110,6 +114,11 @@ export class InputValidator {
             // Only allow http and https protocols
             if (!['http:', 'https:'].includes(parsed.protocol)) {
                 throw new Error(`Invalid URL: unsupported protocol ${parsed.protocol}`);
+            }
+
+            // Warn about embedded credentials (but don't reject - let caller decide)
+            if (parsed.username || parsed.password) {
+                console.warn('Security Warning: URL contains embedded credentials. This may pose security risks.');
             }
 
             return true;
