@@ -118,6 +118,13 @@ export class WelcomePanel {
      * Handle AI provider selection
      */
     private async handleProviderSelection(provider: string): Promise<void> {
+        // Validate provider type
+        const validProviders = ['unified', 'openai', 'claude', 'local'];
+        if (!validProviders.includes(provider)) {
+            vscode.window.showErrorMessage(`Invalid provider: ${provider}`);
+            return;
+        }
+
         await this.configManager.setProvider(provider as any);
         this.sendMessage({ command: 'providerSelected', provider });
         vscode.window.showInformationMessage(`Selected AI provider: ${provider}`);
@@ -609,7 +616,10 @@ Happy writing! 📝
 
     <script>
         const vscode = acquireVsCodeApi();
-        let selectedProvider = '';
+
+        // Restore state from VSCode webview state API
+        const previousState = vscode.getState() || {};
+        let selectedProvider = previousState.selectedProvider || '';
 
         function nextStep() {
             vscode.postMessage({ command: 'nextStep', step: ${this.currentStep + 1} });
@@ -621,6 +631,9 @@ Happy writing! 📝
 
         function selectProvider(provider) {
             selectedProvider = provider;
+            // Persist state using VSCode webview state API
+            vscode.setState({ selectedProvider: provider });
+
             document.querySelectorAll('.provider-card').forEach(card => {
                 card.classList.remove('selected');
             });
@@ -632,6 +645,11 @@ Happy writing! 📝
             const apiKey = document.getElementById('api-key-input').value;
             if (!apiKey) {
                 alert('Please enter an API key');
+                return;
+            }
+            // Get provider from state or backend
+            if (!selectedProvider) {
+                alert('Please select a provider first');
                 return;
             }
             vscode.postMessage({ command: 'saveApiKey', provider: selectedProvider, apiKey });
