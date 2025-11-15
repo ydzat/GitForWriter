@@ -478,6 +478,11 @@ Happy writing! 📝
             border-color: var(--vscode-textLink-foreground);
             transform: translateY(-2px);
         }
+        .provider-card:focus {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+            border-color: var(--vscode-textLink-foreground);
+        }
         .provider-card.selected {
             border-color: var(--vscode-charts-green);
             background-color: var(--vscode-editor-selectionBackground);
@@ -659,7 +664,8 @@ Happy writing! 📝
 
         // Restore state from VSCode webview state API
         const previousState = vscode.getState() || {};
-        let selectedProvider = previousState.selectedProvider || '';
+        // Sync with backend provider (${this.configManager.getCurrentProvider() || ''})
+        let selectedProvider = previousState.selectedProvider || '${this.configManager.getCurrentProvider() || ''}';
 
         function nextStep() {
             vscode.postMessage({ command: 'nextStep', step: ${this.currentStep + 1} });
@@ -679,6 +685,15 @@ Happy writing! 📝
             });
             document.getElementById('provider-' + provider).classList.add('selected');
             vscode.postMessage({ command: 'selectProvider', provider });
+        }
+
+        // Handle keyboard navigation for provider cards
+        function handleProviderKeyDown(event, provider) {
+            // Activate on Enter or Space key
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectProvider(provider);
+            }
         }
 
         function saveApiKey() {
@@ -809,17 +824,23 @@ Happy writing! 📝
                 Select the AI provider you want to use for intelligent writing assistance.
             </p>
             <div class="provider-grid">
-                <div id="provider-openai" class="provider-card ${currentProvider === 'openai' ? 'selected' : ''}" onclick="selectProvider('openai')">
+                <div id="provider-openai" class="provider-card ${currentProvider === 'openai' ? 'selected' : ''}"
+                     tabindex="0" role="button" aria-label="Select OpenAI provider"
+                     onclick="selectProvider('openai')" onkeydown="handleProviderKeyDown(event, 'openai')">
                     <div class="provider-icon">🟢</div>
                     <div class="provider-name">OpenAI</div>
                     <div class="provider-desc">GPT-4, GPT-3.5</div>
                 </div>
-                <div id="provider-claude" class="provider-card ${currentProvider === 'claude' ? 'selected' : ''}" onclick="selectProvider('claude')">
+                <div id="provider-claude" class="provider-card ${currentProvider === 'claude' ? 'selected' : ''}"
+                     tabindex="0" role="button" aria-label="Select Anthropic Claude provider"
+                     onclick="selectProvider('claude')" onkeydown="handleProviderKeyDown(event, 'claude')">
                     <div class="provider-icon">🟣</div>
                     <div class="provider-name">Anthropic Claude</div>
                     <div class="provider-desc">Claude 3.5 Sonnet</div>
                 </div>
-                <div id="provider-local" class="provider-card ${currentProvider === 'local' ? 'selected' : ''}" onclick="selectProvider('local')">
+                <div id="provider-local" class="provider-card ${currentProvider === 'local' ? 'selected' : ''}"
+                     tabindex="0" role="button" aria-label="Select Local LLM provider"
+                     onclick="selectProvider('local')" onkeydown="handleProviderKeyDown(event, 'local')">
                     <div class="provider-icon">💻</div>
                     <div class="provider-name">Local LLM</div>
                     <div class="provider-desc">Ollama, LM Studio</div>
