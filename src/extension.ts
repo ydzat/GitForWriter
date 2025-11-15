@@ -43,6 +43,13 @@ export async function activate(context: vscode.ExtensionContext) {
         statsCollector = new StatsCollector(workspaceFolder.uri.fsPath);
     }
 
+    // Cleanup previousWordCounts when documents are closed to prevent memory leaks
+    context.subscriptions.push(
+        vscode.workspace.onDidCloseTextDocument((doc) => {
+            previousWordCounts.delete(doc.fileName);
+        })
+    );
+
     // Initialize error handler
     if (workspaceFolder) {
         errorHandler.initialize(workspaceFolder.uri.fsPath);

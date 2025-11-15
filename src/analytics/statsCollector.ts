@@ -135,14 +135,20 @@ export class StatsCollector {
 
     /**
      * Disable statistics collection
+     * Ends current session before disabling to preserve data
      */
     disable(): void {
+        // End current session to preserve data
+        if (this.currentSession) {
+            this.endSession();
+        }
         this.stats.enabled = false;
         this.saveStats();
     }
 
     /**
      * Get current statistics
+     * Note: Returns a shallow copy. Do not modify nested objects or arrays.
      */
     getStats(): WritingStats {
         return { ...this.stats };
@@ -229,11 +235,21 @@ export class StatsCollector {
      * End current session and save statistics
      */
     endSession(): void {
+        // Guard against concurrent calls
         if (!this.currentSession) {
             return;
         }
 
         const session = this.currentSession;
+        // Clear current session immediately to prevent race conditions
+        this.currentSession = null;
+
+        // Clear timeout
+        if (this.sessionTimeout) {
+            clearTimeout(this.sessionTimeout);
+            this.sessionTimeout = null;
+        }
+
         this.stats.sessions.push(session);
         this.stats.totalWords += session.wordsWritten;
 
@@ -243,7 +259,6 @@ export class StatsCollector {
         // Update streaks
         this.updateStreaks(session.date);
 
-        this.currentSession = null;
         this.saveStats();
     }
 
@@ -318,11 +333,12 @@ export class StatsCollector {
     }
 
     /**
-     * Get date string in YYYY-MM-DD format
+     * Get date string in YYYY-MM-DD format using local timezone
      */
     private getDateString(timestamp: number): string {
         const date = new Date(timestamp);
-        return date.toISOString().split('T')[0];
+        // Use local time for date string generation to match streak calculation
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 
     /**
