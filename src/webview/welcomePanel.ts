@@ -852,7 +852,9 @@ Happy writing! 📝
             `;
         }
 
-        const providerName = provider === 'openai' ? 'OpenAI' : 'Anthropic Claude';
+        const providerName = provider === 'openai' ? 'OpenAI' :
+            provider === 'claude' ? 'Anthropic Claude' :
+            provider === 'unified' ? 'Unified Provider' : 'Unknown';
         const keyUrl = provider === 'openai'
             ? 'https://platform.openai.com/api-keys'
             : 'https://console.anthropic.com/settings/keys';
