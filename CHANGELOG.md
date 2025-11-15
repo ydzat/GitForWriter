@@ -67,7 +67,7 @@ All notable changes to the GitForWriter extension will be documented in this fil
 - 实现 `AICache` 类：LRU 缓存，支持 TTL 和大小限制
 - 实现 `debounce` 函数：通用防抖工具
 - 实现 `PerformanceMonitor` 类：性能监控和统计
-- 优化 `GitManager`：添加 Git 状态和 diff 缓存
+- 优化 `GitManager`：添加 Git diff 缓存
 - 优化 `UnifiedProvider`：集成 AI 响应缓存
 - 优化 `extension.ts`：添加防抖和性能监控
 - 新增单元测试：`aiCache.test.ts`、`debounce.test.ts`

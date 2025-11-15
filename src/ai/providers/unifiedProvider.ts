@@ -106,10 +106,11 @@ export class UnifiedProvider implements AIProvider {
      * Generate cache key from content and metadata
      * Combines content with stringified metadata to prevent key collisions
      * The AICache will hash this combined string with SHA-256
+     * Note: The operation type is passed separately to AICache.get/set methods
      */
     private generateCacheKey(content: string, metadata: any): string {
         // Combine content with metadata separator to avoid collisions
-        // AICache.generateKey will hash this entire string
+        // AICache.generateKey will hash this entire string along with the operation type
         const metadataStr = metadata ? JSON.stringify(metadata) : '';
         return `${content}\n---METADATA---\n${metadataStr}`;
     }

@@ -299,9 +299,9 @@ Unified Provider 通过 Vercel AI SDK 提供对多个 LLM 提供商的统一访�
 
 ```json
 {
-  "gitforwriter.performance.debounceDelay": 2000,      // 文档保存防抖延迟（毫秒，0-10000）
+  "gitforwriter.performance.debounceDelay": 2000,      // 文档保存防抖延迟（毫秒，0-10秒）
   "gitforwriter.performance.enableCache": true,        // 启用 AI 响应缓存
-  "gitforwriter.performance.cacheTTL": 3600000,        // 缓存过期时间（毫秒，1分钟-24小时）
+  "gitforwriter.performance.cacheTTL": 3600000,        // 缓存过期时间（毫秒，1秒-24小时）
   "gitforwriter.performance.cacheMaxSize": 104857600   // 最大缓存大小（字节，10MB-500MB）
 }
 ```
