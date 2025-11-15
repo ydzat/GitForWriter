@@ -108,6 +108,10 @@ export class OpenAIProvider implements AIProvider {
 
         try {
             const response = await this.callOpenAI(prompt, 'text-review');
+
+            // Validate AI response
+            InputValidator.validateAIResponse(response);
+
             const review = this.parseTextReview(response.content);
 
             return {
@@ -129,6 +133,10 @@ export class OpenAIProvider implements AIProvider {
 
         try {
             const response = await this.callOpenAI(prompt, 'generate-suggestions');
+
+            // Validate AI response
+            InputValidator.validateAIResponse(response);
+
             const suggestions = this.parseSuggestions(response.content);
 
             return {

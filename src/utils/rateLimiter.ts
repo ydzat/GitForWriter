@@ -15,6 +15,10 @@ export class RateLimiter {
      * @param refillRate Number of tokens to add per second
      */
     constructor(maxTokens: number = 10, refillRate: number = 1) {
+        if (maxTokens <= 0 || refillRate <= 0) {
+            throw new Error('maxTokens and refillRate must be positive numbers');
+        }
+
         this.maxTokens = maxTokens;
         this.refillRate = refillRate;
         this.refillInterval = 1000; // 1 second

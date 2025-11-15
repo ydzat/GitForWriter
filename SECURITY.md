@@ -109,7 +109,7 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 ## Security Audit History
 
 - **2025-11-15**: Initial security audit completed for v1.0.0
-  - Fixed js-yaml vulnerability (CVE-2023-XXXX)
+  - Fixed js-yaml vulnerability (updated to v4.1.0)
   - Implemented API key masking
   - Added input validation for file paths and LaTeX compilation
   - Created SECURITY.md and PRIVACY.md

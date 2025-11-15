@@ -28,27 +28,18 @@ export class InputValidator {
         const resolvedPath = path.resolve(absolutePath);
         const resolvedWorkspace = path.resolve(workspaceRoot);
 
-        if (!resolvedPath.startsWith(resolvedWorkspace)) {
+        // Normalize workspace path with trailing separator for robust comparison
+        const normalizedWorkspace = resolvedWorkspace.endsWith(path.sep)
+            ? resolvedWorkspace
+            : resolvedWorkspace + path.sep;
+
+        if (!resolvedPath.startsWith(normalizedWorkspace) && resolvedPath !== resolvedWorkspace) {
             throw new Error(`Path traversal detected: ${filePath} is outside workspace`);
         }
 
         // Check for null bytes (can be used to bypass file extension checks)
         if (filePath.includes('\0')) {
             throw new Error('Invalid file path: null byte detected');
-        }
-
-        // Check for suspicious patterns (only for relative paths)
-        // Absolute paths are already validated above
-        if (!path.isAbsolute(filePath)) {
-            const suspiciousPatterns = [
-                /\.\.[\/\\]/,  // Parent directory traversal
-            ];
-
-            for (const pattern of suspiciousPatterns) {
-                if (pattern.test(filePath)) {
-                    throw new Error(`Invalid file path: suspicious pattern detected in ${filePath}`);
-                }
-            }
         }
 
         return resolvedPath;

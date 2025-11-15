@@ -33,6 +33,11 @@ describe('Security Test Suite', () => {
             assert.ok(result.startsWith(workspaceRoot));
         });
 
+        it('Should accept path equal to workspace root', () => {
+            const result = InputValidator.validateFilePath('.', workspaceRoot);
+            assert.strictEqual(result, workspaceRoot);
+        });
+
         it('Should accept valid absolute path within workspace', () => {
             const validPath = path.join(workspaceRoot, 'file.md');
             const result = InputValidator.validateFilePath(validPath, workspaceRoot);
@@ -167,6 +172,42 @@ describe('Security Test Suite', () => {
             const message = '  Add new feature  ';
             const result = InputValidator.validateCommitMessage(message);
             assert.strictEqual(result, 'Add new feature');
+        });
+    });
+
+    describe('Rate Limiter - Parameter Validation', () => {
+        it('Should reject negative maxTokens', () => {
+            const { RateLimiter } = require('../../utils/rateLimiter');
+            assert.throws(() => {
+                new RateLimiter(-1, 1);
+            }, /must be positive numbers/);
+        });
+
+        it('Should reject zero maxTokens', () => {
+            const { RateLimiter } = require('../../utils/rateLimiter');
+            assert.throws(() => {
+                new RateLimiter(0, 1);
+            }, /must be positive numbers/);
+        });
+
+        it('Should reject negative refillRate', () => {
+            const { RateLimiter } = require('../../utils/rateLimiter');
+            assert.throws(() => {
+                new RateLimiter(10, -1);
+            }, /must be positive numbers/);
+        });
+
+        it('Should reject zero refillRate', () => {
+            const { RateLimiter } = require('../../utils/rateLimiter');
+            assert.throws(() => {
+                new RateLimiter(10, 0);
+            }, /must be positive numbers/);
+        });
+
+        it('Should accept valid parameters', () => {
+            const { RateLimiter } = require('../../utils/rateLimiter');
+            const limiter = new RateLimiter(10, 1);
+            assert.ok(limiter);
         });
     });
 

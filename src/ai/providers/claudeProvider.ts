@@ -106,6 +106,10 @@ export class ClaudeProvider implements AIProvider {
 
         try {
             const response = await this.callClaude(prompt, 'text-review');
+
+            // Validate AI response
+            InputValidator.validateAIResponse(response);
+
             const review = this.parseTextReview(response.content);
 
             return {
