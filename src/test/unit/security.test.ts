@@ -311,7 +311,7 @@ describe('Security Test Suite', () => {
 
             const logFile = path.join(tempDir, '.gitforwriter', 'error.log');
             const logContent = fs.readFileSync(logFile, 'utf-8');
-            assert.ok(logContent.includes('[Circular Reference]'));
+            assert.ok(logContent.includes('[Already Processed]'));
         });
 
         it('Should handle deeply nested objects', () => {
@@ -464,6 +464,18 @@ describe('Security Test Suite', () => {
             assert.throws(() => {
                 InputValidator.validateConfigValue('option3', 'string', ['option1', 'option2']);
             }, /must be one of option1, option2/);
+        });
+
+        it('Should reject non-array allowedValues', () => {
+            assert.throws(() => {
+                InputValidator.validateConfigValue('test', 'string', 'not-an-array' as any);
+            }, /allowedValues: must be an array/);
+        });
+
+        it('Should reject empty allowedValues array', () => {
+            assert.throws(() => {
+                InputValidator.validateConfigValue('test', 'string', []);
+            }, /allowedValues: array cannot be empty/);
         });
     });
 });

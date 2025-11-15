@@ -113,9 +113,12 @@ export class AIRateLimiters {
 
     /**
      * Get or create a rate limiter for a provider
+     * Note: If a limiter already exists for the provider, it will be returned with its original parameters.
+     * The maxTokens and refillRate parameters are only used when creating a new limiter.
      * @param provider Provider name (e.g., 'openai', 'claude')
-     * @param maxTokens Maximum requests per time window
-     * @param refillRate Requests per second
+     * @param maxTokens Maximum requests per time window (only used for new limiters)
+     * @param refillRate Requests per second (only used for new limiters)
+     * @returns Existing or new RateLimiter instance
      */
     static getOrCreate(provider: string, maxTokens: number = 10, refillRate: number = 1): RateLimiter {
         if (!this.limiters.has(provider)) {

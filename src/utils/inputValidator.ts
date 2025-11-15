@@ -87,6 +87,8 @@ export class InputValidator {
 
     /**
      * Validate a URL to prevent injection attacks
+     * Accepts http/https URLs including localhost, IP addresses, and custom ports
+     * Note: URLs with user credentials (user:pass@host) are allowed but may pose security risks
      * @param url The URL to validate
      * @returns True if valid
      * @throws Error if URL is invalid
@@ -104,7 +106,7 @@ export class InputValidator {
         // Basic URL format validation
         try {
             const parsed = new URL(url);
-            
+
             // Only allow http and https protocols
             if (!['http:', 'https:'].includes(parsed.protocol)) {
                 throw new Error(`Invalid URL: unsupported protocol ${parsed.protocol}`);
@@ -136,6 +138,29 @@ export class InputValidator {
     }
 
     /**
+     * Check for circular references in an object
+     * @param obj The object to check
+     * @param seen WeakSet to track visited objects
+     * @returns True if circular reference detected
+     */
+    private static hasCircular(obj: any, seen: WeakSet<any> = new WeakSet()): boolean {
+        if (obj && typeof obj === 'object') {
+            if (seen.has(obj)) {
+                return true;
+            }
+            seen.add(obj);
+            for (const key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                    if (InputValidator.hasCircular(obj[key], seen)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Validate AI response to ensure it's safe to use
      * @param response The AI response to validate
      * @returns True if valid
@@ -147,24 +172,7 @@ export class InputValidator {
         }
 
         // Check for circular references (prevent JSON.stringify from throwing)
-        function hasCircular(obj: any, seen: WeakSet<any> = new WeakSet()): boolean {
-            if (obj && typeof obj === 'object') {
-                if (seen.has(obj)) {
-                    return true;
-                }
-                seen.add(obj);
-                for (const key in obj) {
-                    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                        if (hasCircular(obj[key], seen)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        if (hasCircular(response)) {
+        if (InputValidator.hasCircular(response)) {
             throw new Error('Invalid AI response: circular reference detected');
         }
 
@@ -218,9 +226,9 @@ export class InputValidator {
             throw new Error('Invalid commit message: null byte detected');
         }
 
-        // Reasonable length
+        // Reasonable length (git recommends 50 chars for subject, 72 for body lines)
         if (trimmed.length > 1000) {
-            throw new Error('Invalid commit message: too long (max 1000 characters)');
+            throw new Error('Invalid commit message: too long (max 1000 characters). Note: git recommends a subject line of 50 characters and body lines of 72 characters for best readability.');
         }
 
         return trimmed;
@@ -250,9 +258,17 @@ export class InputValidator {
             throw new Error(`Invalid config value: expected ${type}, got ${actualType}`);
         }
 
-        // Check allowed values if provided
-        if (allowedValues && !allowedValues.includes(value)) {
-            throw new Error(`Invalid config value: must be one of ${allowedValues.join(', ')}`);
+        // Validate allowedValues parameter if provided
+        if (allowedValues !== undefined) {
+            if (!Array.isArray(allowedValues)) {
+                throw new Error('Invalid allowedValues: must be an array');
+            }
+            if (allowedValues.length === 0) {
+                throw new Error('Invalid allowedValues: array cannot be empty');
+            }
+            if (!allowedValues.includes(value)) {
+                throw new Error(`Invalid config value: must be one of ${allowedValues.join(', ')}`);
+            }
         }
 
         return true;

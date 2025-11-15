@@ -284,6 +284,7 @@ export class ErrorLogger {
      * Sanitize sensitive data from strings
      * Masks API keys and other sensitive information
      * Includes protection against circular references and deep nesting
+     * Note: Shared object references are marked as [Already Processed] to avoid duplication in logs
      */
     private sanitizeSensitiveData(data: any, depth: number = 0, visited: WeakSet<any> = new WeakSet()): any {
         // Prevent stack overflow on deeply nested objects
@@ -296,22 +297,24 @@ export class ErrorLogger {
             data = data.replace(/sk-[a-zA-Z0-9]{20,}/g, 'sk-***REDACTED***');
             // Mask Claude API keys (sk-ant-...)
             data = data.replace(/sk-ant-[a-zA-Z0-9_-]{20,}/g, 'sk-ant-***REDACTED***');
-            // Mask generic API keys
-            data = data.replace(/api[_-]?key["\s:=]+[a-zA-Z0-9_-]{20,}/gi, 'api_key=***REDACTED***');
+            // Mask generic API keys in various formats
+            data = data.replace(/\bapi[_-]?key\s*[:=]\s*["']?([a-zA-Z0-9_]{20,})\b/g, 'api_key=***REDACTED***');
+            data = data.replace(/\bapi[_-]?key\s*["']\s*[:=]\s*([a-zA-Z0-9_]{20,})\b/g, 'api_key=***REDACTED***');
+            data = data.replace(/\bapi[_-]?key\s*["']?\s*([a-zA-Z0-9_]{20,})\b/g, 'api_key=***REDACTED***');
             // Mask bearer tokens
             data = data.replace(/bearer\s+[a-zA-Z0-9_-]{20,}/gi, 'bearer ***REDACTED***');
             return data;
         } else if (Array.isArray(data)) {
-            // Check for circular reference
+            // Check for already processed reference (circular or shared)
             if (visited.has(data)) {
-                return '[Circular Reference]';
+                return '[Already Processed]';
             }
             visited.add(data);
             return data.map(item => this.sanitizeSensitiveData(item, depth + 1, visited));
         } else if (typeof data === 'object' && data !== null) {
-            // Check for circular reference
+            // Check for already processed reference (circular or shared)
             if (visited.has(data)) {
-                return '[Circular Reference]';
+                return '[Already Processed]';
             }
             visited.add(data);
 
