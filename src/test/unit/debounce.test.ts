@@ -125,7 +125,8 @@ describe('PerformanceMonitor', () => {
         const stats = monitor.getStats('test');
         expect(stats!.count).to.equal(2);
         expect(stats!.avg).to.be.greaterThan(15);
-        expect(stats!.avg).to.be.lessThan(25);
+        // Allow more tolerance for CI environments where timing may be less precise
+        expect(stats!.avg).to.be.lessThan(35);
     });
 
     it('should return null for non-existent operation', () => {

@@ -2,6 +2,8 @@
  * Debounce utility for delaying function execution
  */
 
+import * as vscode from 'vscode';
+
 /**
  * Debounced function wrapper
  */
@@ -72,9 +74,11 @@ export function debounce<T extends (...args: any[]) => any>(
 export class PerformanceMonitor {
     private operations: Map<string, number[]> = new Map();
     private slowThreshold: number;
+    private outputChannel: vscode.OutputChannel | null = null;
 
-    constructor(slowThreshold: number = 1000) {
+    constructor(slowThreshold: number = 1000, outputChannel?: vscode.OutputChannel) {
         this.slowThreshold = slowThreshold;
+        this.outputChannel = outputChannel || null;
     }
 
     /**
@@ -88,7 +92,10 @@ export class PerformanceMonitor {
             this.record(operationName, duration);
 
             if (duration > this.slowThreshold) {
-                console.warn(`⚠️ Slow operation detected: ${operationName} took ${duration}ms`);
+                const message = `⚠️ Slow operation detected: ${operationName} took ${duration}ms`;
+                if (this.outputChannel) {
+                    this.outputChannel.appendLine(message);
+                }
             }
         };
     }

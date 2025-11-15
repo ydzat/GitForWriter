@@ -29,6 +29,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     console.log('GitForWriter is now active');
 
+    // Create output channel for performance logging
+    const outputChannel = vscode.window.createOutputChannel('GitForWriter Performance');
+
     const gitManager = new GitManager();
     const statusBarManager = new StatusBarManager();
     const secretManager = new SecretManager(context.secrets);
@@ -36,7 +39,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const diffAnalyzer = new DiffAnalyzer(configManager, secretManager);
     const reviewEngine = new ReviewEngine(configManager, secretManager);
     const exportManager = new ExportManager();
-    const performanceMonitor = new PerformanceMonitor(1000); // 1s threshold
+    const performanceMonitor = new PerformanceMonitor(1000, outputChannel); // 1s threshold
 
     // Initialize StatsCollector
     let statsCollector: StatsCollector | undefined;
@@ -152,10 +155,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Clear cache command
     const clearCacheCommand = vscode.commands.registerCommand('gitforwriter.clearCache', async () => {
-        // Clear cache in AI provider if it's UnifiedProvider
-        const provider = (diffAnalyzer as any).aiProvider;
-        if (provider && typeof provider.clearCache === 'function') {
-            provider.clearCache();
+        // Clear cache via DiffAnalyzer
+        const cleared = diffAnalyzer.clearAICache();
+        if (cleared) {
             vscode.window.showInformationMessage('✅ AI cache cleared successfully');
         } else {
             vscode.window.showWarningMessage('Cache clearing not available for current AI provider');
@@ -176,9 +178,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register document save handler with debouncing
     const saveHandler = vscode.workspace.onDidSaveTextDocument((document) => {
-        // Show analyzing indicator
-        vscode.window.setStatusBarMessage('$(sync~spin) Analyzing changes...', debounceDelay + 1000);
-        debouncedHandleDocumentSave(document);
+        // Show analyzing indicator until analysis completes
+        const statusBarDisposable = vscode.window.setStatusBarMessage('$(sync~spin) Analyzing changes...');
+        Promise.resolve(debouncedHandleDocumentSave(document)).finally(() => {
+            statusBarDisposable.dispose();
+        });
     });
 
     context.subscriptions.push(

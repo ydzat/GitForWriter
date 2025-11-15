@@ -99,6 +99,14 @@ export class UnifiedProvider implements AIProvider {
     }
 
     /**
+     * Generate cache key from content and metadata
+     * Uses JSON.stringify to prevent key collisions
+     */
+    private generateCacheKey(content: string, metadata: any): string {
+        return JSON.stringify({ content, metadata: metadata || {} });
+    }
+
+    /**
      * Validate the provider configuration
      */
     async validate(): Promise<boolean> {
@@ -130,7 +138,7 @@ export class UnifiedProvider implements AIProvider {
      */
     async analyzeDiff(diff: string, context?: AnalysisContext): Promise<AIResponse<DiffAnalysis>> {
         // Check cache first
-        const cacheKey = diff + JSON.stringify(context || {});
+        const cacheKey = this.generateCacheKey(diff, context);
         const cached = this.diffCache.get(cacheKey, 'diff-analysis');
         if (cached) {
             console.log('✅ Cache hit for diff analysis');
@@ -167,7 +175,7 @@ export class UnifiedProvider implements AIProvider {
      */
     async reviewText(text: string, context?: ReviewContext): Promise<AIResponse<TextReview>> {
         // Check cache first
-        const cacheKey = text + JSON.stringify(context || {});
+        const cacheKey = this.generateCacheKey(text, context);
         const cached = this.reviewCache.get(cacheKey, 'text-review');
         if (cached) {
             console.log('✅ Cache hit for text review');
@@ -204,7 +212,7 @@ export class UnifiedProvider implements AIProvider {
      */
     async generateSuggestions(text: string, issues: Issue[]): Promise<AIResponse<Suggestion[]>> {
         // Check cache first
-        const cacheKey = text + JSON.stringify(issues);
+        const cacheKey = this.generateCacheKey(text, issues);
         const cached = this.suggestionsCache.get(cacheKey, 'generate-suggestions');
         if (cached) {
             console.log('✅ Cache hit for suggestions');

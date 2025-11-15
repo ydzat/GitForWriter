@@ -265,4 +265,16 @@ export class DiffAnalyzer {
 
         return summary || '无明显变化';
     }
+
+    /**
+     * Clear AI provider cache if available
+     * @returns true if cache was cleared, false if not available
+     */
+    clearAICache(): boolean {
+        if (this.aiProvider && typeof (this.aiProvider as any).clearCache === 'function') {
+            (this.aiProvider as any).clearCache();
+            return true;
+        }
+        return false;
+    }
 }
