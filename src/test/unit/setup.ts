@@ -118,6 +118,7 @@ Module.prototype.require = function(id: string) {
     if (id === 'vscode') {
         return vscode;
     }
-    return originalRequire.apply(this, arguments);
+    // Use original require for all other modules
+    return originalRequire.apply(this, arguments as any);
 };
 
