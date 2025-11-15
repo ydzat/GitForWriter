@@ -245,5 +245,243 @@ describe('ReviewEngine Unit Tests', () => {
             expect(review.rating).to.be.at.most(10);
         });
     });
+
+    describe('File path and document type detection', () => {
+        it('should handle review with file path', async () => {
+            const analysis = createMockAnalysis();
+            const filePath = '/test/document.md';
+
+            const review = await reviewEngine.generateReview(analysis, filePath);
+
+            expect(review.filePath).to.equal(filePath);
+        });
+
+        it('should handle review without file path', async () => {
+            const analysis = createMockAnalysis();
+
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review.filePath).to.be.undefined;
+        });
+
+        it('should detect markdown file type', async () => {
+            const analysis = createMockAnalysis();
+            const filePath = '/test/document.md';
+            const fullContent = '# Test Document\n\nThis is a test.';
+
+            const review = await reviewEngine.generateReview(analysis, filePath, fullContent);
+
+            expect(review).to.exist;
+        });
+
+        it('should detect LaTeX file type', async () => {
+            const analysis = createMockAnalysis();
+            const filePath = '/test/document.tex';
+            const fullContent = '\\documentclass{article}\n\\begin{document}\nTest\\end{document}';
+
+            const review = await reviewEngine.generateReview(analysis, filePath, fullContent);
+
+            expect(review).to.exist;
+        });
+
+        it('should handle .markdown extension', async () => {
+            const analysis = createMockAnalysis();
+            const filePath = '/test/document.markdown';
+            const fullContent = '# Test';
+
+            const review = await reviewEngine.generateReview(analysis, filePath, fullContent);
+
+            expect(review).to.exist;
+        });
+    });
+
+    describe('Semantic changes handling', () => {
+        it('should handle addition semantic changes', async () => {
+            const semanticChanges: SemanticChange[] = [
+                {
+                    type: 'addition',
+                    description: 'Added new section',
+                    lineNumber: 10,
+                    confidence: 0.9
+                }
+            ];
+
+            const analysis = createMockAnalysis({ semanticChanges });
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review).to.exist;
+            expect(review.suggestions).to.be.an('array');
+        });
+
+        it('should handle deletion semantic changes', async () => {
+            const semanticChanges: SemanticChange[] = [
+                {
+                    type: 'deletion',
+                    description: 'Removed outdated content',
+                    lineNumber: 5,
+                    confidence: 0.85
+                }
+            ];
+
+            const analysis = createMockAnalysis({ semanticChanges });
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review).to.exist;
+        });
+
+        it('should handle modification semantic changes', async () => {
+            const semanticChanges: SemanticChange[] = [
+                {
+                    type: 'modification',
+                    description: 'Updated terminology',
+                    lineNumber: 15,
+                    confidence: 0.95
+                }
+            ];
+
+            const analysis = createMockAnalysis({ semanticChanges });
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review).to.exist;
+        });
+
+        it('should handle mixed semantic changes', async () => {
+            const semanticChanges: SemanticChange[] = [
+                {
+                    type: 'addition',
+                    description: 'Added new section',
+                    lineNumber: 10,
+                    confidence: 0.9
+                },
+                {
+                    type: 'deletion',
+                    description: 'Removed outdated content',
+                    lineNumber: 5,
+                    confidence: 0.85
+                },
+                {
+                    type: 'modification',
+                    description: 'Updated terminology',
+                    lineNumber: 15,
+                    confidence: 0.95
+                }
+            ];
+
+            const analysis = createMockAnalysis({ semanticChanges });
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review).to.exist;
+            expect(review.suggestions).to.be.an('array');
+        });
+
+        it('should generate suggestions for text with "很"', async () => {
+            const semanticChanges: SemanticChange[] = [
+                {
+                    type: 'addition',
+                    description: '这个方法很好用',
+                    lineNumber: 10,
+                    confidence: 0.9
+                }
+            ];
+
+            const analysis = createMockAnalysis({ semanticChanges });
+            const fullContent = '这个方法很好用\n其他内容';
+            const review = await reviewEngine.generateReview(analysis, 'test.md', fullContent);
+
+            expect(review).to.exist;
+            expect(review.suggestions).to.be.an('array');
+        });
+
+        it('should generate suggestions for text with "非常"', async () => {
+            const semanticChanges: SemanticChange[] = [
+                {
+                    type: 'addition',
+                    description: '这个功能非常强大',
+                    lineNumber: 10,
+                    confidence: 0.9
+                }
+            ];
+
+            const analysis = createMockAnalysis({ semanticChanges });
+            const fullContent = '这个功能非常强大\n其他内容';
+            const review = await reviewEngine.generateReview(analysis, 'test.md', fullContent);
+
+            expect(review).to.exist;
+            expect(review.suggestions).to.be.an('array');
+        });
+
+        it('should generate suggestions for text with both "很" and "非常"', async () => {
+            const semanticChanges: SemanticChange[] = [
+                {
+                    type: 'addition',
+                    description: '这个方法很好用，非常强大',
+                    lineNumber: 10,
+                    confidence: 0.9
+                }
+            ];
+
+            const analysis = createMockAnalysis({ semanticChanges });
+            const fullContent = '这个方法很好用，非常强大\n其他内容';
+            const review = await reviewEngine.generateReview(analysis, 'test.md', fullContent);
+
+            expect(review).to.exist;
+            expect(review.suggestions).to.be.an('array');
+        });
+    });
+
+    describe('Edge cases', () => {
+        it('should handle zero additions and deletions', async () => {
+            const analysis = createMockAnalysis({
+                additions: 0,
+                deletions: 0,
+                modifications: 0
+            });
+
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review.overall).to.exist;
+            expect(review.rating).to.be.a('number');
+        });
+
+        it('should handle very high consistency score', async () => {
+            const analysis = createMockAnalysis({
+                consistencyReport: {
+                    score: 100,
+                    issues: [],
+                    suggestions: []
+                }
+            });
+
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review.rating).to.be.greaterThan(7);
+        });
+
+        it('should handle very low consistency score', async () => {
+            const analysis = createMockAnalysis({
+                consistencyReport: {
+                    score: 30,
+                    issues: ['Major issue 1', 'Major issue 2', 'Major issue 3'],
+                    suggestions: ['Fix 1', 'Fix 2']
+                }
+            });
+
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review.rating).to.be.lessThan(6);
+            expect(review.improvements.length).to.be.greaterThan(2);
+        });
+
+        it('should handle empty semantic changes array', async () => {
+            const analysis = createMockAnalysis({
+                semanticChanges: []
+            });
+
+            const review = await reviewEngine.generateReview(analysis);
+
+            expect(review).to.exist;
+            expect(review.suggestions).to.be.an('array');
+        });
+    });
 });
 
