@@ -83,6 +83,10 @@
       {
         "command": "gitforwriter.clearCache",
         "title": "GitForWriter: Clear AI Cache"
+      },
+      {
+        "command": "gitforwriter.gettingStarted",
+        "title": "GitForWriter: Getting Started"
       }
     ],
     "configuration": {

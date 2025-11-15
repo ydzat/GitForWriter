@@ -6,6 +6,7 @@ import { GitManager } from './utils/gitManager';
 import { StatusBarManager } from './utils/statusBarManager';
 import { AIReviewPanel } from './webview/aiReviewPanel';
 import { StatsPanel } from './webview/statsPanel';
+import { WelcomePanel } from './webview/welcomePanel';
 import { DiffAnalyzer } from './ai/diff/diffAnalyzer';
 import { ReviewEngine } from './ai/review/reviewEngine';
 import { ExportManager } from './ai/export/exportManager';
@@ -73,6 +74,13 @@ export async function activate(context: vscode.ExtensionContext) {
             );
             await errorHandler.handle(gitError);
         }
+    }
+
+    // Check if this is the first time the extension is activated
+    const hasCompletedOnboarding = context.globalState.get('gitforwriter.onboardingCompleted', false);
+    if (!hasCompletedOnboarding) {
+        // Show welcome panel for first-time users
+        WelcomePanel.createOrShow(context.extensionUri, context, configManager, secretManager);
     }
 
     // Register commands
@@ -153,6 +161,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(message, { modal: true });
     });
 
+    // Getting Started command (re-open welcome panel)
+    const gettingStartedCommand = vscode.commands.registerCommand('gitforwriter.gettingStarted', async () => {
+        WelcomePanel.createOrShow(context.extensionUri, context, configManager, secretManager);
+    });
+
     // Clear cache command
     const clearCacheCommand = vscode.commands.registerCommand('gitforwriter.clearCache', async () => {
         // Clear cache via DiffAnalyzer
@@ -229,6 +242,7 @@ export async function activate(context: vscode.ExtensionContext) {
         disableStatsCommand,
         viewPerformanceCommand,
         clearCacheCommand,
+        gettingStartedCommand,
         configChangeListener,
         saveHandler,
         statusBarManager
