@@ -77,7 +77,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     // Check if this is the first time the extension is activated
-    const hasCompletedOnboarding = context.globalState.get('gitforwriter.onboardingCompleted', false);
+    const hasCompletedOnboarding = context.globalState.get(WelcomePanel.ONBOARDING_COMPLETED_KEY, false);
     if (!hasCompletedOnboarding) {
         // Show welcome panel for first-time users
         WelcomePanel.createOrShow(context.extensionUri, context, configManager, secretManager);

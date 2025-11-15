@@ -7,6 +7,10 @@ import { SecretManager } from '../config/secretManager';
  * Provides guided setup wizard and interactive tutorial
  */
 export class WelcomePanel {
+    // Global state keys for onboarding status
+    public static readonly ONBOARDING_COMPLETED_KEY = 'gitforwriter.onboardingCompleted';
+    public static readonly ONBOARDING_SKIPPED_KEY = 'gitforwriter.onboardingSkipped';
+
     public static currentPanel: WelcomePanel | undefined;
     private readonly panel: vscode.WebviewPanel;
     private readonly extensionUri: vscode.Uri;
@@ -313,8 +317,8 @@ Happy writing! 📝
      * Handle skip onboarding
      */
     private async handleSkipOnboarding(): Promise<void> {
-        await this.context.globalState.update('gitforwriter.onboardingCompleted', true);
-        await this.context.globalState.update('gitforwriter.onboardingSkipped', true);
+        await this.context.globalState.update(WelcomePanel.ONBOARDING_COMPLETED_KEY, true);
+        await this.context.globalState.update(WelcomePanel.ONBOARDING_SKIPPED_KEY, true);
         vscode.window.showInformationMessage('You can access this guide anytime with "GitForWriter: Getting Started"');
         this.dispose();
     }
@@ -323,7 +327,7 @@ Happy writing! 📝
      * Handle complete onboarding
      */
     private async handleCompleteOnboarding(): Promise<void> {
-        await this.context.globalState.update('gitforwriter.onboardingCompleted', true);
+        await this.context.globalState.update(WelcomePanel.ONBOARDING_COMPLETED_KEY, true);
         vscode.window.showInformationMessage('🎉 Welcome to GitForWriter! Happy writing!');
         this.dispose();
     }
