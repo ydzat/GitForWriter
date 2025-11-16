@@ -64,13 +64,20 @@ export class OpenAIProvider implements AIProvider {
      */
     async validate(): Promise<boolean> {
         try {
-            // Make a minimal API call to verify the API key
-            await this.client.models.retrieve('gpt-3.5-turbo');
-            return true;
+            // For OpenAI-compatible APIs, use a simple chat completion instead of models.retrieve
+            // because not all compatible APIs support the models endpoint
+            const response = await this.client.chat.completions.create({
+                model: this.model,
+                messages: [{ role: 'user', content: 'Hi' }],
+                max_tokens: 5
+            });
+            return !!response;
         } catch (error: any) {
-            if (error.status === 401) {
+            if (error.status === 401 || error.statusCode === 401) {
                 throw new AIProviderError('Invalid OpenAI API key', 'INVALID_API_KEY', 401, error);
             }
+            // For other errors, log but don't throw - might be network issues
+            console.error('Validation error:', error);
             return false;
         }
     }
@@ -107,6 +114,7 @@ export class OpenAIProvider implements AIProvider {
         const prompt = this.buildTextReviewPrompt(text, context);
 
         try {
+            console.log(`[OpenAIProvider] Calling reviewText with model: ${this.model}`);
             const response = await this.callOpenAI(prompt, 'text-review');
 
             // Validate AI response
@@ -121,6 +129,7 @@ export class OpenAIProvider implements AIProvider {
                 timestamp: new Date()
             };
         } catch (error) {
+            console.error(`[OpenAIProvider] reviewText failed:`, error);
             throw this.handleError(error, 'reviewText');
         }
     }
@@ -284,31 +293,56 @@ Respond ONLY with valid JSON.`;
         const audienceInfo = context?.targetAudience ? `Target Audience: ${context.targetAudience}` : '';
         const contextInfo = styleInfo || audienceInfo ? `\n${styleInfo}\n${audienceInfo}\n` : '';
 
+        // Add line numbers to help AI identify exact positions
+        const lines = text.split('\n');
+        const numberedText = lines.map((line, index) => `${index + 1}: ${line}`).join('\n');
+
         return `You are a professional writing editor. Review the following text and provide detailed feedback.
 ${contextInfo}
-Text to Review:
+Text to Review (with line numbers):
 \`\`\`
-${text}
+${numberedText}
 \`\`\`
+
+IMPORTANT: The text above has line numbers prepended (e.g., "1: ", "2: ", etc.). When providing suggestions:
+- The "line" field should be the line number shown (1-based, for display)
+- The "startLine" and "endLine" should be 0-based (line number - 1)
+- The "startColumn" and "endColumn" should be 0-based positions in the ORIGINAL text (without the line number prefix)
+- The "original" text should be the exact text from the document (without line numbers)
+- The "suggested" text should be your recommended replacement
+
+IMPORTANT INSTRUCTIONS:
+1. **Language Detection**: First, analyze the text to determine its PRIMARY language (the language that makes up the majority of the content). If the text contains multiple languages, identify which one is dominant.
+2. **Response Language**: Provide ALL feedback (overall assessment, strengths, improvements, suggestions, reasons, descriptions) in the SAME language as the primary language of the text.
+   - If the text is primarily in English, respond in English
+   - If the text is primarily in Chinese, respond in Chinese
+   - If the text is primarily in Japanese, respond in Japanese
+   - And so on for any other language
+3. **Rating System**: The rating (0-10) should be calculated based on clear criteria:
+   - Start with a base score of 7
+   - Add points (+0.5 to +1.0 each) for: excellent grammar, clear structure, engaging style, strong content, good flow
+   - Deduct points (-0.5 to -1.0 each) for: grammar errors, unclear structure, inconsistent style, weak content, poor flow
+   - Each strength and improvement point should directly correspond to score adjustments
+4. **Scoring Transparency**: In the "overall" field, briefly explain the score (e.g., "Score 8.5/10: +1 for clear structure, +0.5 for engaging style, -0.5 for minor grammar issues")
 
 Provide your review in JSON format with the following structure:
 {
-  "overall": "Overall assessment in Chinese",
-  "strengths": ["List of strengths"],
-  "improvements": ["List of areas for improvement"],
+  "overall": "Overall assessment with score explanation in the PRIMARY language of the text",
+  "strengths": ["List of strengths in the PRIMARY language - each should correspond to a positive score adjustment"],
+  "improvements": ["List of areas for improvement in the PRIMARY language - each should correspond to a negative score adjustment"],
   "rating": 0-10,
   "suggestions": [
     {
       "id": "unique-id",
       "type": "grammar|style|structure|content|clarity",
-      "line": number,
-      "startLine": number,
-      "startColumn": number,
-      "endLine": number,
-      "endColumn": number,
-      "original": "original text",
+      "line": <line number from the numbered text (1-based)>,
+      "startLine": <line - 1 (0-based)>,
+      "startColumn": <column position in original text, 0-based>,
+      "endLine": <line - 1 (0-based)>,
+      "endColumn": <end column position in original text, 0-based>,
+      "original": "exact text from the line (without line number prefix)",
       "suggested": "suggested replacement",
-      "reason": "explanation in Chinese",
+      "reason": "explanation in the PRIMARY language of the text",
       "confidence": 0.0-1.0
     }
   ],
@@ -316,11 +350,30 @@ Provide your review in JSON format with the following structure:
     {
       "type": "grammar|style|structure|content|clarity",
       "line": number,
-      "description": "description in Chinese",
+      "description": "description in the PRIMARY language of the text",
       "severity": "low|medium|high"
     }
   ]
 }
+
+EXAMPLE:
+If the text is:
+1: Once upon a time, there lived a little fox.
+2: The fox was very clever.
+
+And you want to suggest changing "little fox" to "small fox" on line 1:
+{
+  "line": 1,
+  "startLine": 0,
+  "startColumn": 35,
+  "endLine": 0,
+  "endColumn": 45,
+  "original": "little fox",
+  "suggested": "small fox",
+  ...
+}
+
+Note: startColumn=35 because "little fox" starts at position 35 in "Once upon a time, there lived a little fox."
 
 Review for:
 - Grammar and spelling

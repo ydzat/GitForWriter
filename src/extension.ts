@@ -16,6 +16,7 @@ import { StatsCollector } from './analytics/statsCollector';
 import { errorHandler } from './utils/errorHandlerUI';
 import { GitError } from './utils/errorHandler';
 import { debounce, PerformanceMonitor } from './utils/debounce';
+import { i18n } from './i18n';
 
 export async function activate(context: vscode.ExtensionContext) {
     // Load .env file for development/testing ONLY
@@ -87,10 +88,10 @@ export async function activate(context: vscode.ExtensionContext) {
         // Show a friendly reminder if no workspace is open
         if (!workspaceFolder) {
             vscode.window.showInformationMessage(
-                'Welcome to GitForWriter! For the best experience, open a folder to access all features.',
-                'Open Folder'
+                i18n.getMessage('welcomeToGitForWriter'),
+                i18n.getMessage('openFolder')
             ).then(selection => {
-                if (selection === 'Open Folder') {
+                if (selection === i18n.getMessage('openFolder')) {
                     vscode.commands.executeCommand('vscode.openFolder');
                 }
             });
@@ -103,7 +104,7 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     const aiReviewCommand = vscode.commands.registerCommand('gitforwriter.aiReview', async () => {
-        await performAIReview(context, gitManager, diffAnalyzer, reviewEngine, performanceMonitor);
+        await performAIReview(context, gitManager, diffAnalyzer, reviewEngine, performanceMonitor, outputChannel);
     });
 
     const exportDraftCommand = vscode.commands.registerCommand('gitforwriter.exportDraft', async () => {
@@ -130,26 +131,62 @@ export async function activate(context: vscode.ExtensionContext) {
         await clearAPIKeys(secretManager);
     });
 
+    // Show current configuration command
+    const showConfigCommand = vscode.commands.registerCommand('gitforwriter.showConfig', async () => {
+        const config = configManager.getConfig();
+        const hasOpenAIKey = await secretManager.hasKey('openai');
+        const hasClaudeKey = await secretManager.hasKey('claude');
+        const maskedOpenAIKey = await secretManager.getMaskedOpenAIKey();
+
+        const configInfo = `
+📋 GitForWriter Configuration
+
+🤖 Provider: ${config.provider}
+
+OpenAI Configuration:
+  - Model: ${config.openai.model}
+  - Base URL: ${config.openai.baseURL || '(default: https://api.openai.com)'}
+  - API Key: ${hasOpenAIKey ? maskedOpenAIKey : '❌ Not set'}
+
+Claude Configuration:
+  - Model: ${config.claude.model}
+  - API Key: ${hasClaudeKey ? '✅ Set' : '❌ Not set'}
+
+Unified Provider:
+  - Provider: ${config.unified.provider}
+  - Model: ${config.unified.model}
+  - Base URL: ${config.unified.baseURL || '(not set)'}
+
+Local LLM:
+  - Endpoint: ${config.local.endpoint}
+  - Model: ${config.local.model}
+        `.trim();
+
+        outputChannel.clear();
+        outputChannel.appendLine(configInfo);
+        outputChannel.show();
+    });
+
     // Statistics commands
     const viewStatsCommand = vscode.commands.registerCommand('gitforwriter.viewStatistics', async () => {
         if (statsCollector) {
             StatsPanel.createOrShow(statsCollector);
         } else {
-            vscode.window.showErrorMessage('No workspace folder open');
+            vscode.window.showErrorMessage(i18n.getMessage('noWorkspaceFolder'));
         }
     });
 
     const enableStatsCommand = vscode.commands.registerCommand('gitforwriter.enableStatistics', async () => {
         if (statsCollector) {
             statsCollector.enable();
-            vscode.window.showInformationMessage('Writing statistics enabled');
+            vscode.window.showInformationMessage(i18n.getMessage('statisticsEnabled'));
         }
     });
 
     const disableStatsCommand = vscode.commands.registerCommand('gitforwriter.disableStatistics', async () => {
         if (statsCollector) {
             statsCollector.disable();
-            vscode.window.showInformationMessage('Writing statistics disabled');
+            vscode.window.showInformationMessage(i18n.getMessage('statisticsDisabled'));
         }
     });
 
@@ -251,6 +288,7 @@ export async function activate(context: vscode.ExtensionContext) {
         setOpenAIKeyCommand,
         setClaudeKeyCommand,
         clearKeysCommand,
+        showConfigCommand,
         viewStatsCommand,
         enableStatsCommand,
         disableStatsCommand,
@@ -316,7 +354,8 @@ async function performAIReview(
     gitManager: GitManager,
     diffAnalyzer: DiffAnalyzer,
     reviewEngine: ReviewEngine,
-    performanceMonitor: PerformanceMonitor
+    performanceMonitor: PerformanceMonitor,
+    outputChannel: vscode.OutputChannel
 ) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -359,11 +398,19 @@ async function performAIReview(
         // Show review panel
         AIReviewPanel.createOrShow(context.extensionUri, review, document.fileName);
 
-        vscode.window.showInformationMessage('✅ AI Review completed');
+        // Show completion message with link to output channel
+        vscode.window.showInformationMessage(
+            i18n.getMessage('aiReviewCompleted'),
+            i18n.getMessage('viewLogs')
+        ).then(selection => {
+            if (selection === i18n.getMessage('viewLogs')) {
+                outputChannel.show();
+            }
+        });
         endTiming();
     } catch (error) {
         endTiming();
-        vscode.window.showErrorMessage(`AI Review failed: ${error}`);
+        vscode.window.showErrorMessage(`${i18n.getMessage('aiReviewFailed')}: ${error}`);
     }
 }
 

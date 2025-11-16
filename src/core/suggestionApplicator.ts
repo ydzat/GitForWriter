@@ -34,82 +34,112 @@ export interface ApplyResult {
  */
 export class SuggestionApplicator {
     /**
-     * Apply a single suggestion to the active editor
+     * Apply a single suggestion - directly modifies the file using file system API
+     * This approach is more robust than relying on editor state
      */
     async applySuggestion(suggestion: Suggestion): Promise<ApplyResult> {
-        const editor = vscode.window.activeTextEditor;
-        
-        if (!editor) {
-            return {
-                success: false,
-                suggestionId: suggestion.id,
-                message: 'No active editor',
-                error: 'Please open the file in the editor'
-            };
-        }
+        try {
+            const fs = require('fs').promises;
+            const path = require('path');
 
-        // Validate file path matches
-        if (!this._isCorrectFile(editor.document, suggestion.filePath)) {
-            return {
-                success: false,
-                suggestionId: suggestion.id,
-                message: 'Wrong file',
-                error: `This suggestion is for ${suggestion.filePath}, but you have ${editor.document.fileName} open`
-            };
-        }
-
-        // Check if file is read-only
-        if (editor.document.isUntitled && editor.document.uri.scheme === 'untitled') {
-            // Untitled files are editable
-        } else if (editor.document.uri.scheme === 'file') {
-            // Check file permissions (VSCode handles this, but we can check)
+            // Read the file content
+            let content: string;
             try {
-                await vscode.workspace.fs.stat(editor.document.uri);
+                content = await fs.readFile(suggestion.filePath, 'utf8');
             } catch (error) {
                 return {
                     success: false,
                     suggestionId: suggestion.id,
-                    message: 'File access error',
-                    error: 'Cannot access the file'
+                    message: 'File not found',
+                    error: `Cannot read file: ${suggestion.filePath}`
                 };
             }
-        }
 
-        // Validate suggestion is still applicable (conflict detection)
-        const validationResult = this._validateSuggestion(editor.document, suggestion);
-        if (!validationResult.valid) {
-            return {
-                success: false,
-                suggestionId: suggestion.id,
-                message: 'Suggestion no longer applicable',
-                error: validationResult.reason
-            };
-        }
+            // Split content into lines
+            const lines = content.split('\n');
 
-        // Apply the suggestion
-        try {
-            const success = await editor.edit((editBuilder) => {
-                const range = new vscode.Range(
-                    new vscode.Position(suggestion.startLine, suggestion.startColumn),
-                    new vscode.Position(suggestion.endLine, suggestion.endColumn)
-                );
-                editBuilder.replace(range, suggestion.suggested);
-            });
-
-            if (success) {
-                return {
-                    success: true,
-                    suggestionId: suggestion.id,
-                    message: 'Suggestion applied successfully'
-                };
-            } else {
+            // Validate line numbers are within bounds
+            if (suggestion.startLine < 0 || suggestion.startLine >= lines.length ||
+                suggestion.endLine < 0 || suggestion.endLine >= lines.length) {
                 return {
                     success: false,
                     suggestionId: suggestion.id,
-                    message: 'Failed to apply suggestion',
-                    error: 'Edit operation was rejected'
+                    message: 'Suggestion no longer applicable',
+                    error: `Line numbers out of bounds. File has ${lines.length} lines, but suggestion references lines ${suggestion.startLine + 1}-${suggestion.endLine + 1}.`
                 };
             }
+
+            // Apply the edit
+            if (suggestion.startLine === suggestion.endLine) {
+                // Single line edit
+                const line = lines[suggestion.startLine];
+
+                // Validate column numbers
+                if (suggestion.startColumn < 0 || suggestion.startColumn > line.length ||
+                    suggestion.endColumn < 0 || suggestion.endColumn > line.length) {
+                    return {
+                        success: false,
+                        suggestionId: suggestion.id,
+                        message: 'Suggestion no longer applicable',
+                        error: `Column numbers out of bounds. Line ${suggestion.startLine + 1} has ${line.length} characters, but suggestion references columns ${suggestion.startColumn}-${suggestion.endColumn}.`
+                    };
+                }
+
+                // Replace the text
+                const before = line.substring(0, suggestion.startColumn);
+                const after = line.substring(suggestion.endColumn);
+                lines[suggestion.startLine] = before + suggestion.suggested + after;
+            } else {
+                // Multi-line edit
+                const startLine = lines[suggestion.startLine];
+                const endLine = lines[suggestion.endLine];
+
+                // Validate column numbers
+                if (suggestion.startColumn < 0 || suggestion.startColumn > startLine.length) {
+                    return {
+                        success: false,
+                        suggestionId: suggestion.id,
+                        message: 'Suggestion no longer applicable',
+                        error: `Start column out of bounds. Line ${suggestion.startLine + 1} has ${startLine.length} characters, but suggestion references column ${suggestion.startColumn}.`
+                    };
+                }
+
+                if (suggestion.endColumn < 0 || suggestion.endColumn > endLine.length) {
+                    return {
+                        success: false,
+                        suggestionId: suggestion.id,
+                        message: 'Suggestion no longer applicable',
+                        error: `End column out of bounds. Line ${suggestion.endLine + 1} has ${endLine.length} characters, but suggestion references column ${suggestion.endColumn}.`
+                    };
+                }
+
+                // Replace the text across multiple lines
+                const before = startLine.substring(0, suggestion.startColumn);
+                const after = endLine.substring(suggestion.endColumn);
+                const newContent = before + suggestion.suggested + after;
+
+                // Remove the lines in between and replace with new content
+                lines.splice(suggestion.startLine, suggestion.endLine - suggestion.startLine + 1, newContent);
+            }
+
+            // Write the modified content back to the file
+            const newContent = lines.join('\n');
+            await fs.writeFile(suggestion.filePath, newContent, 'utf8');
+
+            // If the file is open in VSCode, reload it
+            const uri = vscode.Uri.file(suggestion.filePath);
+            const openDoc = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === uri.fsPath);
+            if (openDoc && openDoc.isDirty) {
+                // The document is open and has unsaved changes
+                // We need to reload it to reflect our file system changes
+                await vscode.commands.executeCommand('workbench.action.files.revert', uri);
+            }
+
+            return {
+                success: true,
+                suggestionId: suggestion.id,
+                message: 'Suggestion applied successfully'
+            };
         } catch (error) {
             return {
                 success: false,
@@ -196,101 +226,5 @@ export class SuggestionApplicator {
         };
     }
 
-    /**
-     * Validate if a suggestion is still applicable
-     */
-    private _validateSuggestion(
-        document: vscode.TextDocument,
-        suggestion: Suggestion
-    ): { valid: boolean; reason?: string } {
-        // Check if line numbers are within document bounds
-        // Line numbers are 0-based, so the last valid line is document.lineCount - 1
-        if (suggestion.startLine < 0 || suggestion.startLine > document.lineCount - 1 ||
-            suggestion.endLine < 0 || suggestion.endLine > document.lineCount - 1) {
-            return {
-                valid: false,
-                reason: 'Line numbers are out of document bounds. The document may have been modified.'
-            };
-        }
-
-        // Check if column numbers are within line bounds
-        const startLine = document.lineAt(suggestion.startLine);
-        const endLine = document.lineAt(suggestion.endLine);
-
-        // Column positions are 0-based, and line.text.length is a valid position (end of line)
-        // for insertions or selections, so we allow positions from 0 to line.text.length (inclusive)
-        if (suggestion.startColumn < 0 || suggestion.startColumn > startLine.text.length ||
-            suggestion.endColumn < 0 || suggestion.endColumn > endLine.text.length) {
-            return {
-                valid: false,
-                reason: 'Column numbers are out of line bounds. The document may have been modified.'
-            };
-        }
-
-        // Check if the original text still matches
-        try {
-            const range = new vscode.Range(
-                new vscode.Position(suggestion.startLine, suggestion.startColumn),
-                new vscode.Position(suggestion.endLine, suggestion.endColumn)
-            );
-            const currentText = document.getText(range);
-
-            if (currentText !== suggestion.original) {
-                return {
-                    valid: false,
-                    reason: 'The text at this location has changed since the review was generated.'
-                };
-            }
-        } catch (error) {
-            return {
-                valid: false,
-                reason: 'Invalid range or position in document.'
-            };
-        }
-
-        // Check document version if available
-        if (suggestion.documentVersion !== undefined && document.version !== suggestion.documentVersion) {
-            // Document has been modified, but text might still match
-            // We already checked text match above, so this is just a warning
-            // For now, we'll allow it if text matches
-        }
-
-        return { valid: true };
-    }
-
-    /**
-     * Check if the editor has the correct file open
-     */
-    private _isCorrectFile(document: vscode.TextDocument, suggestionFilePath: string): boolean {
-        // Normalize paths for comparison
-        const docPath = document.uri.fsPath.replace(/\\/g, '/');
-        const suggPath = suggestionFilePath.replace(/\\/g, '/');
-
-        // First check for exact match
-        if (docPath === suggPath) {
-            return true;
-        }
-
-        // Check if suggestion path is a suffix of document path by comparing path segments
-        // This is more robust than simple string suffix matching
-        // For example: /path/to/file.md should match file.md or to/file.md
-        // but NOT match /different/file.md or /path/to/myfile.md
-        const docSegments = docPath.split('/').filter(s => s.length > 0);
-        const suggSegments = suggPath.split('/').filter(s => s.length > 0);
-
-        if (suggSegments.length <= docSegments.length) {
-            // Get the last N segments from document path where N = suggestion segments length
-            const docSuffix = docSegments.slice(-suggSegments.length);
-
-            // Compare each segment for exact match
-            const allSegmentsMatch = docSuffix.every((seg, idx) => seg === suggSegments[idx]);
-
-            if (allSegmentsMatch) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }
 
