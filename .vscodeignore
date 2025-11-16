@@ -4,25 +4,59 @@
 src/**
 .gitignore
 .git/**
+.github/**
 
 # Build configuration
 tsconfig.json
 .eslintrc.json
 **/*.map
+.mocharc.json
+.nycrc.json
 
 # Source files
 **/*.ts
 
 # Test files
 **/test/**
+out/test/**
 
 # Coverage
 coverage/**
 .nyc_output/**
 
-# Documentation
+# Environment and secrets
+.env
+.env.*
+
+# Documentation (keep only essential ones)
 vsc-extension-quickstart.md
+IMPLEMENTATION_PLAN_ISSUE_38.md
+IMPLEMENTATION_SUMMARY.md
+TESTING.md
+TESTING_AI_DIFF_ANALYZER.md
+ENHANCED_LATEX_FEATURES.md
+PDF_EXPORT_GUIDE.md
+PERFORMANCE.md
+
+# Test documents
+test-documents/**
+
+# Scripts
+scripts/**
+
+# AI module examples (keep structure but not examples)
+ai/diff/README.md
+ai/export/README.md
+ai/review/README.md
 
 # Misc
 .DS_Store
 *.vsix
+node_modules/**/.bin/**
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/*.md
+node_modules/**/*.txt
+node_modules/**/LICENSE
+node_modules/**/CHANGELOG*
+node_modules/**/.github/**

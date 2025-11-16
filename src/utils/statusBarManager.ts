@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { i18n } from '../i18n';
 
 export type WritingStage = 'ideation' | 'writing' | 'review' | 'publish';
 
@@ -17,7 +18,7 @@ export class StatusBarManager implements vscode.Disposable {
 
     updateStage(stage: WritingStage): void {
         this.currentStage = stage;
-        
+
         const stageIcons: Record<WritingStage, string> = {
             ideation: '💡',
             writing: '✍️',
@@ -25,20 +26,16 @@ export class StatusBarManager implements vscode.Disposable {
             publish: '🚀'
         };
 
-        const stageNames: Record<WritingStage, string> = {
-            ideation: 'Ideation',
-            writing: 'Writing',
-            review: 'Review',
-            publish: 'Publish'
-        };
+        const stageName = i18n.getStatusBarStage(stage);
 
-        this.statusBarItem.text = `${stageIcons[stage]} ${stageNames[stage]}`;
-        this.statusBarItem.tooltip = `Writing Stage: ${stageNames[stage]}`;
+        this.statusBarItem.text = `${stageIcons[stage]} ${stageName}`;
+        this.statusBarItem.tooltip = `${i18n.getStrings().statusBar.writingStage}: ${stageName}`;
     }
 
     updateProgress(current: number, total: number): void {
         const percentage = Math.round((current / total) * 100);
-        this.statusBarItem.text = `$(pencil) Writing: ${percentage}%`;
+        const writingText = i18n.getStatusBarStage('writing');
+        this.statusBarItem.text = `$(pencil) ${writingText}: ${percentage}%`;
     }
 
     dispose(): void {

@@ -46,7 +46,7 @@ export class WelcomePanel {
                         await this.handleProviderSelection(message.provider);
                         break;
                     case 'saveApiKey':
-                        await this.handleApiKeySave(message.apiKey);
+                        await this.handleApiKeySave(message.apiKey, message.baseURL, message.model);
                         break;
                     case 'testConfiguration':
                         await this.handleTestConfiguration();
@@ -141,7 +141,7 @@ export class WelcomePanel {
      * Handle API key save
      * Gets provider from backend configuration instead of relying on frontend state
      */
-    private async handleApiKeySave(apiKey: string): Promise<void> {
+    private async handleApiKeySave(apiKey: string, baseURL?: string, model?: string): Promise<void> {
         try {
             // Get provider from backend configuration (single source of truth)
             const provider = this.configManager.getCurrentProvider();
@@ -155,6 +155,24 @@ export class WelcomePanel {
             // Save API key based on provider
             if (provider === 'openai') {
                 await this.secretManager.setOpenAIKey(apiKey);
+
+                // Save baseURL if provided
+                if (baseURL && baseURL.trim()) {
+                    await vscode.workspace.getConfiguration('gitforwriter').update(
+                        'openai.baseURL',
+                        baseURL.trim(),
+                        vscode.ConfigurationTarget.Global
+                    );
+                }
+
+                // Save model if provided
+                if (model && model.trim()) {
+                    await vscode.workspace.getConfiguration('gitforwriter').update(
+                        'openai.model',
+                        model.trim(),
+                        vscode.ConfigurationTarget.Global
+                    );
+                }
             } else if (provider === 'claude') {
                 await this.secretManager.setClaudeKey(apiKey);
             } else if (provider === 'unified') {
@@ -181,10 +199,11 @@ export class WelcomePanel {
             }
 
             this.sendMessage({ command: 'apiKeySaved', success: true });
-            vscode.window.showInformationMessage('API key saved successfully');
+            const configMsg = baseURL ? ` (Base URL: ${baseURL})` : '';
+            vscode.window.showInformationMessage(`Configuration saved successfully${configMsg}`);
         } catch (error) {
             this.sendMessage({ command: 'apiKeySaved', success: false, error: String(error) });
-            vscode.window.showErrorMessage(`Failed to save API key: ${error}`);
+            vscode.window.showErrorMessage(`Failed to save configuration: ${error}`);
         }
     }
 
@@ -714,8 +733,20 @@ Happy writing! 📝
                 });
                 return;
             }
-            // Send API key to backend - provider will be determined from backend config
-            vscode.postMessage({ command: 'saveApiKey', apiKey });
+
+            // Get optional baseURL and model (for OpenAI provider)
+            const baseURLInput = document.getElementById('base-url-input');
+            const modelInput = document.getElementById('model-input');
+            const baseURL = baseURLInput ? baseURLInput.value : undefined;
+            const model = modelInput ? modelInput.value : undefined;
+
+            // Send API key and optional config to backend
+            vscode.postMessage({
+                command: 'saveApiKey',
+                apiKey,
+                baseURL,
+                model
+            });
         }
 
         function testConfiguration() {
@@ -836,8 +867,8 @@ Happy writing! 📝
                      tabindex="0" role="button" aria-label="Select OpenAI provider"
                      onclick="selectProvider('openai')" onkeydown="handleProviderKeyDown(event, 'openai')">
                     <div class="provider-icon">🟢</div>
-                    <div class="provider-name">OpenAI</div>
-                    <div class="provider-desc">GPT-4, GPT-3.5</div>
+                    <div class="provider-name">OpenAI / Compatible</div>
+                    <div class="provider-desc">GPT-4, DeepSeek, Qwen, etc.</div>
                 </div>
                 <div id="provider-claude" class="provider-card ${currentProvider === 'claude' ? 'selected' : ''}"
                      tabindex="0" role="button" aria-label="Select Anthropic Claude provider"
@@ -855,7 +886,7 @@ Happy writing! 📝
                 </div>
             </div>
             <div class="info-box">
-                <strong>💡 Tip:</strong> You can change this later in settings with the command "GitForWriter: Configure AI Provider"
+                <strong>💡 Tip:</strong> OpenAI option supports OpenAI-compatible APIs like DeepSeek, Qwen, etc. You can change provider later in settings.
             </div>
         `;
     }
@@ -881,12 +912,47 @@ Happy writing! 📝
             `;
         }
 
-        const providerName = provider === 'openai' ? 'OpenAI' :
+        const providerName = provider === 'openai' ? 'OpenAI / Compatible API' :
             provider === 'claude' ? 'Anthropic Claude' :
             provider === 'unified' ? 'Unified Provider' : 'Unknown';
-        const keyUrl = provider === 'openai'
-            ? 'https://platform.openai.com/api-keys'
-            : 'https://console.anthropic.com/settings/keys';
+
+        if (provider === 'openai') {
+            return `
+                <h2 class="step-title">🔑 Configure ${providerName}</h2>
+                <p class="step-description">
+                    Configure your OpenAI or OpenAI-compatible API (DeepSeek, Qwen, etc.)
+                </p>
+                <div class="input-group">
+                    <label for="api-key-input">API Key:</label>
+                    <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label for="base-url-input">Base URL (Optional):</label>
+                    <input type="text" id="base-url-input" placeholder="Leave empty for OpenAI, or enter custom URL" autocomplete="off">
+                    <small style="color: var(--vscode-descriptionForeground); margin-top: 4px; display: block;">
+                        Examples: https://api.deepseek.com (DeepSeek), https://dashscope.aliyuncs.com/compatible-mode/v1 (Qwen)
+                    </small>
+                </div>
+                <div class="input-group">
+                    <label for="model-input">Model Name (Optional):</label>
+                    <input type="text" id="model-input" placeholder="gpt-4 (default)" autocomplete="off">
+                    <small style="color: var(--vscode-descriptionForeground); margin-top: 4px; display: block;">
+                        Examples: gpt-4, deepseek-chat, qwen-plus
+                    </small>
+                </div>
+                <button onclick="saveApiKey()">Save Configuration</button>
+                <div class="info-box">
+                    <strong>🔗 Popular Providers:</strong><br>
+                    • <strong>OpenAI:</strong> <a href="https://platform.openai.com/api-keys" target="_blank">Get API Key</a> (leave Base URL empty)<br>
+                    • <strong>DeepSeek:</strong> <a href="https://platform.deepseek.com/api_keys" target="_blank">Get API Key</a> (Base URL: https://api.deepseek.com)<br>
+                    • <strong>Qwen:</strong> <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">Get API Key</a> (Base URL: https://dashscope.aliyuncs.com/compatible-mode/v1)
+                </div>
+            `;
+        }
+
+        const keyUrl = provider === 'claude'
+            ? 'https://console.anthropic.com/settings/keys'
+            : 'https://platform.openai.com/api-keys';
 
         return `
             <h2 class="step-title">🔑 Enter Your ${providerName} API Key</h2>

@@ -1,0 +1,23 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="128" height="128" rx="16" fill="#2D3748"/>
+  
+  <!-- Git branch icon (left side) -->
+  <circle cx="32" cy="32" r="8" fill="#48BB78" stroke="#2F855A" stroke-width="2"/>
+  <line x1="32" y1="40" x2="32" y2="64" stroke="#48BB78" stroke-width="3"/>
+  <circle cx="32" cy="72" r="8" fill="#48BB78" stroke="#2F855A" stroke-width="2"/>
+  
+  <!-- Pen/Writing icon (right side) -->
+  <path d="M 80 30 L 98 48 L 70 76 L 52 58 Z" fill="#4299E1" stroke="#2B6CB0" stroke-width="2"/>
+  <path d="M 52 58 L 48 80 L 70 76 Z" fill="#63B3ED" stroke="#2B6CB0" stroke-width="2"/>
+  
+  <!-- AI sparkle (top right) -->
+  <circle cx="100" cy="28" r="4" fill="#F6E05E"/>
+  <path d="M 100 20 L 100 36 M 92 28 L 108 28" stroke="#F6E05E" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Document lines (bottom) -->
+  <rect x="24" y="88" width="80" height="4" rx="2" fill="#A0AEC0"/>
+  <rect x="24" y="96" width="64" height="4" rx="2" fill="#A0AEC0"/>
+  <rect x="24" y="104" width="72" height="4" rx="2" fill="#A0AEC0"/>
+</svg>
+

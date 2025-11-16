@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { Review } from '../ai/review/reviewEngine';
 import { SuggestionApplicator, Suggestion } from '../core/suggestionApplicator';
+import { i18n } from '../i18n';
 
 export class AIReviewPanel {
     public static currentPanel: AIReviewPanel | undefined;
@@ -378,19 +379,19 @@ export class AIReviewPanel {
     </style>
 </head>
 <body>
-    <h1>🔍 AI 审校结果</h1>
-    
+    <h1>${i18n.getStrings().review.title}</h1>
+
     <div class="rating">
         ${this._getRatingStars(review.rating)} ${review.rating.toFixed(1)}/10
     </div>
 
     <div class="overall">
-        <strong>总体评价：</strong>
+        <strong>${i18n.getStrings().review.overallAssessment}</strong>
         <p>${review.overall}</p>
     </div>
 
     <div class="section">
-        <h2>✨ 优点</h2>
+        <h2>${i18n.getStrings().review.strengths}</h2>
         <ul>
             ${review.strengths.map(s => `
                 <li class="item strength">${s}</li>
@@ -399,7 +400,7 @@ export class AIReviewPanel {
     </div>
 
     <div class="section">
-        <h2>📋 需要改进</h2>
+        <h2>${i18n.getStrings().review.improvements}</h2>
         <ul>
             ${review.improvements.map(i => `
                 <li class="item improvement">${i}</li>
@@ -408,37 +409,35 @@ export class AIReviewPanel {
     </div>
 
     <div class="section">
-        <h2>💡 修改建议</h2>
+        <h2>${i18n.getStrings().review.suggestions}</h2>
         ${review.suggestions.length > 0 ? review.suggestions.map((s, index) => {
             // Escape all dynamic values for consistency, even though UUIDs are safe
             const escapedId = this._escapeHtml(s.id);
+            const lineText = i18n.getStrings().review.line;
+            const originalText = i18n.getStrings().review.original;
+            const suggestedText = i18n.getStrings().review.suggested;
+            const applyText = i18n.getStrings().review.applySuggestion;
             return `
             <div class="suggestion" id="suggestion-${escapedId}">
                 <span class="suggestion-type type-${s.type}">${this._getTypeLabel(s.type)}</span>
-                ${s.line > 0 ? `<span style="opacity: 0.7;"> (第 ${s.line} 行)</span>` : ''}
+                ${s.line > 0 ? `<span style="opacity: 0.7;"> (${lineText} ${s.line} ${i18n.getLocale() === 'zh-cn' ? '行' : ''})</span>` : ''}
                 <div class="suggestion-reason">${this._escapeHtml(s.reason)}</div>
-                ${s.original ? `<div style="margin-top: 8px;"><strong>原文：</strong> ${this._escapeHtml(s.original)}</div>` : ''}
-                ${s.suggested ? `<div style="margin-top: 4px;"><strong>建议：</strong> ${this._escapeHtml(s.suggested)}</div>` : ''}
+                ${s.original ? `<div style="margin-top: 8px;"><strong>${originalText}</strong> ${this._escapeHtml(s.original)}</div>` : ''}
+                ${s.suggested ? `<div style="margin-top: 4px;"><strong>${suggestedText}</strong> ${this._escapeHtml(s.suggested)}</div>` : ''}
                 <div class="suggestion-buttons">
                     ${s.suggested && s.suggested.trim() !== '' ? `
-                        <button id="btn-${escapedId}" onclick="applySuggestion('${escapedId}')">
-                            <span class="btn-text">采纳建议</span>
-                        </button>
-                        <span id="status-${escapedId}" class="status-message"></span>
+                        <div style="margin-top: 10px; padding: 8px; background-color: var(--vscode-inputValidation-warningBackground); border-left: 4px solid var(--vscode-inputValidation-warningBorder); border-radius: 4px;">
+                            <strong>⚠️ ${i18n.getLocale() === 'zh-cn' ? '注意' : 'Note'}:</strong> ${i18n.getLocale() === 'zh-cn' ? '自动应用功能暂时禁用，请手动复制建议的文本进行修改。' : 'Auto-apply feature is temporarily disabled. Please manually copy the suggested text to make changes.'}
+                        </div>
                     ` : ''}
                 </div>
             </div>
         `;
-        }).join('') : '<p>暂无具体建议</p>'}
+        }).join('') : `<p>${i18n.getStrings().review.noSuggestions}</p>`}
     </div>
 
     <div class="actions">
-        ${review.suggestions.filter(s => s.suggested && s.suggested.trim() !== '').length > 0 ? `
-            <button id="apply-all-btn" onclick="applyAll()">
-                <span class="btn-text">一键采纳所有建议</span>
-            </button>
-        ` : ''}
-        <button onclick="close()">关闭</button>
+        <button onclick="close()">${i18n.getStrings().review.close}</button>
     </div>
 
     <script>
@@ -533,13 +532,12 @@ export class AIReviewPanel {
     }
 
     private _getTypeLabel(type: string): string {
-        const labels: Record<string, string> = {
-            grammar: '语法',
-            style: '风格',
-            structure: '结构',
-            content: '内容'
-        };
-        return labels[type] || type;
+        const validTypes = ['grammar', 'style', 'structure', 'content', 'clarity'] as const;
+        type ReviewType = typeof validTypes[number];
+        if (validTypes.includes(type as any)) {
+            return i18n.getReviewType(type as ReviewType);
+        }
+        return type;
     }
 
     private _escapeHtml(text: string): string {

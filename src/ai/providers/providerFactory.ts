@@ -53,15 +53,27 @@ export async function initializeAIProvider(
         const apiKey = await secretManager.getOpenAIKey();
         if (!apiKey) {
             console.warn('OpenAI API key not found, will use fallback');
+            if (outputChannel) {
+                outputChannel.appendLine('⚠️ OpenAI API key not found in SecretStorage');
+            }
             return null;
         }
 
         const { OpenAIProvider } = await import('./openaiProvider');
-        return new OpenAIProvider({
+        const providerConfig = {
             apiKey,
             model: config.openai.model,
             baseURL: config.openai.baseURL
-        });
+        };
+
+        if (outputChannel) {
+            outputChannel.appendLine(`🔧 Initializing OpenAI Provider:`);
+            outputChannel.appendLine(`   Model: ${providerConfig.model}`);
+            outputChannel.appendLine(`   Base URL: ${providerConfig.baseURL || '(default OpenAI)'}`);
+            outputChannel.appendLine(`   API Key: ${apiKey.substring(0, 7)}...${apiKey.substring(apiKey.length - 4)}`);
+        }
+
+        return new OpenAIProvider(providerConfig);
     } else if (provider === 'claude') {
         const apiKey = await secretManager.getClaudeKey();
         if (!apiKey) {

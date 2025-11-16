@@ -76,6 +76,10 @@ export class ReviewEngine {
         // Try AI-powered review first
         if (this.aiProvider && fullContent) {
             try {
+                if (this.outputChannel) {
+                    this.outputChannel.appendLine('🤖 Using AI-powered review');
+                }
+
                 // Detect document type from file extension
                 let documentType: 'markdown' | 'latex' = 'markdown';
                 if (filePath) {
@@ -95,11 +99,23 @@ export class ReviewEngine {
 
                 const result = await this.aiProvider.reviewText(fullContent, context);
 
+                if (this.outputChannel) {
+                    this.outputChannel.appendLine(`✅ AI review completed (model: ${result.model})`);
+                }
+
                 // Convert AI review to our Review format
                 return this.convertAIReview(result.data, analysis, filePath);
             } catch (error) {
                 // Fall back to rule-based review on AI failure
+                if (this.outputChannel) {
+                    this.outputChannel.appendLine(`⚠️ AI review failed, falling back to rule-based review: ${error}`);
+                }
                 // Error is logged by AI provider
+            }
+        } else {
+            if (this.outputChannel) {
+                const reason = !this.aiProvider ? 'AI provider not initialized' : 'No content provided';
+                this.outputChannel.appendLine(`ℹ️ Using rule-based review (${reason})`);
             }
         }
 

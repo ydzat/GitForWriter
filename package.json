@@ -3,13 +3,13 @@
   "displayName": "GitForWriter",
   "description": "AI-assisted writing workflow with Git-like version control for Markdown and LaTeX",
   "version": "1.0.0",
-  "publisher": "gitforwriter",
+  "publisher": "ydzat",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other",
-    "SCM Providers"
+    "Other"
   ],
   "keywords": [
     "writing",
@@ -19,7 +19,15 @@
     "version control",
     "ai",
     "review",
-    "diff"
+    "diff",
+    "ai-review",
+    "writing-assistant",
+    "deepseek",
+    "openai",
+    "claude",
+    "gpt-4",
+    "export",
+    "pdf"
   ],
   "repository": {
     "type": "git",
@@ -29,6 +37,10 @@
     "url": "https://github.com/ydzat/GitForWriter/issues"
   },
   "homepage": "https://github.com/ydzat/GitForWriter#readme",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onLanguage:markdown",
     "onLanguage:latex"
@@ -63,6 +75,10 @@
       {
         "command": "gitforwriter.clearAPIKeys",
         "title": "GitForWriter: Clear API Keys"
+      },
+      {
+        "command": "gitforwriter.showConfig",
+        "title": "GitForWriter: Show Configuration"
       },
       {
         "command": "gitforwriter.viewStatistics",
@@ -307,5 +323,5 @@
   "overrides": {
     "js-yaml": "^4.1.1"
   },
-  "license": "MIT"
+  "license": "AGPL-3.0"
 }
