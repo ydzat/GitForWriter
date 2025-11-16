@@ -1,7 +1,10 @@
+# Source files (we bundle everything into dist/)
+src/**
+out/**
+
 # Development files
 .vscode/**
 .vscode-test/**
-src/**
 .gitignore
 .git/**
 .github/**
@@ -12,13 +15,16 @@ tsconfig.json
 **/*.map
 .mocharc.json
 .nycrc.json
+webpack.config.js
+esbuild.js
 
 # Source files
 **/*.ts
+!dist/**
 
 # Test files
 **/test/**
-out/test/**
+test-documents/**
 
 # Coverage
 coverage/**
@@ -28,35 +34,25 @@ coverage/**
 .env
 .env.*
 
-# Documentation (keep only essential ones)
+# Documentation (development only)
 vsc-extension-quickstart.md
-IMPLEMENTATION_PLAN_ISSUE_38.md
-IMPLEMENTATION_SUMMARY.md
-TESTING.md
-TESTING_AI_DIFF_ANALYZER.md
-ENHANCED_LATEX_FEATURES.md
-PDF_EXPORT_GUIDE.md
-PERFORMANCE.md
-
-# Test documents
-test-documents/**
+.github/RELEASE.md
 
 # Scripts
 scripts/**
 
-# AI module examples (keep structure but not examples)
-ai/diff/README.md
-ai/export/README.md
-ai/review/README.md
-
 # Misc
 .DS_Store
 *.vsix
-node_modules/**/.bin/**
-node_modules/**/test/**
-node_modules/**/tests/**
-node_modules/**/*.md
-node_modules/**/*.txt
-node_modules/**/LICENSE
-node_modules/**/CHANGELOG*
-node_modules/**/.github/**
+*.log
+
+# Node modules - we bundle everything, so exclude all node_modules
+node_modules/**
+
+# GitForWriter data
+.gitforwriter/**
+
+# IDE
+.idea/**
+*.swp
+*.swo

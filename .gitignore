@@ -1,10 +1,43 @@
-node_modules
-out
-.vscode-test
-*.vsix
-.DS_Store
-coverage
-.nyc_output
-test-claude-manual.ts
-.env
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# Testing
+.vscode-test/
+coverage/
+.nyc_output/
+
+# VSCode
 .vscode/settings.json
+.vscode/*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Extension packages
+*.vsix
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+test-claude-manual.ts
+
+# GitForWriter data (user-specific)
+.gitforwriter/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
